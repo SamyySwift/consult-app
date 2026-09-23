@@ -4,7 +4,7 @@ class AppConstants {
   AppConstants._();
 
   // App Info
-  static const String appName = 'AutoMove';
+  static const String appName = 'Carpital Consult';
   static const String appTagline = 'Your vehicle, safely delivered.';
 
   // Routes
@@ -22,6 +22,10 @@ class AppConstants {
   static const String routeProfile = '/profile';
   static const String routeBookingNew = '/booking/new';
   static const String routeNotifications = '/notifications';
+
+  // Railway API Backend Configuration
+  static String get apiBaseUrl =>
+      dotenv.env['API_BASE_URL'] ?? 'https://carpitalconsult.com';
 
   // Supabase Configuration
   static const String supabaseUrl = 'https://ulksjcitenlxtvxwvktw.supabase.co';

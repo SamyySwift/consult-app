@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { fetchPricing as apiFetchPricing, savePricing as apiSavePricing } from '../lib/api';
 
 function formatAmount(value) {
   if (value === null || value === undefined) return '0';
@@ -26,12 +26,7 @@ export function SettingsView() {
   const fetchPricing = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('pricing_config')
-        .select('*')
-        .order('id', { ascending: true });
-        
-      if (error) throw error;
+      const data = await apiFetchPricing();
       
       const formatted = (data || []).map(p => ({
         ...p,
@@ -57,18 +52,14 @@ export function SettingsView() {
     setSaving(true);
     setMessage(null);
     try {
-      for (const p of pricingData) {
-        const { error } = await supabase
-          .from('pricing_config')
-          .update({
-            base_price: parseAmount(p.base_price_str),
-            enclosed_addon: parseAmount(p.enclosed_addon_str),
-            insurance_rate: parseAmount(p.insurance_rate_str)
-          })
-          .eq('id', p.id);
-        
-        if (error) throw error;
-      }
+      const payload = pricingData.map(p => ({
+        id: p.id,
+        base_price: parseAmount(p.base_price_str),
+        enclosed_addon: parseAmount(p.enclosed_addon_str),
+        insurance_rate: parseAmount(p.insurance_rate_str),
+      }));
+
+      await apiSavePricing(payload);
       setMessage({ type: 'success', text: 'Pricing configuration saved successfully.' });
       setTimeout(() => setMessage(null), 3000);
     } catch (err) {

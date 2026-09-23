@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { supabase } from '../lib/supabase';
+import { assignDriver, updateBookingStatus } from '../lib/api';
 
 export function DetailDrawer() {
   const { jobs, drivers, selectedJobId, setSelectedJobId, fetchBookings } = useAppContext();
@@ -63,17 +63,7 @@ export function DetailDrawer() {
     setAssigning(true);
     setAssignError('');
     try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({
-          driver_id: selectedDriverId,
-          status: 'assigned',
-          assigned_at: new Date().toISOString(),
-        })
-        .eq('id', job.dbId);
-
-      if (error) throw error;
-
+      await assignDriver(job.dbId, selectedDriverId);
       await fetchBookings();
       setAssignMode(false);
       setSelectedDriverId('');
@@ -98,10 +88,7 @@ export function DetailDrawer() {
     }
     if (action === 'cancel') {
       try {
-        await supabase
-          .from('bookings')
-          .update({ status: 'cancelled' })
-          .eq('id', job.dbId);
+        await updateBookingStatus(job.dbId, 'cancelled');
         await fetchBookings();
       } catch (err) {
         console.error('Cancel failed:', err);
@@ -112,17 +99,15 @@ export function DetailDrawer() {
 
     // Status-update actions
     const statusMap = {
-      markPickedUp:   { status: 'pickedUp',   field: 'picked_up_at' },
-      markInTransit:  { status: 'inTransit',  field: null },
-      markDelivered:  { status: 'completed',  field: 'completed_at' },
+      markPickedUp:   'pickedUp',
+      markInTransit:  'inTransit',
+      markDelivered:  'completed',
     };
-    const mapping = statusMap[action];
-    if (!mapping) return;
+    const newStatus = statusMap[action];
+    if (!newStatus) return;
 
     try {
-      const update = { status: mapping.status };
-      if (mapping.field) update[mapping.field] = new Date().toISOString();
-      await supabase.from('bookings').update(update).eq('id', job.dbId);
+      await updateBookingStatus(job.dbId, newStatus);
       await fetchBookings();
     } catch (err) {
       console.error('Action failed:', err);

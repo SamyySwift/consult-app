@@ -54,7 +54,8 @@ final _router = GoRouter(
       builder: (context, state) => Theme(
         data: AppTheme.darkTheme,
         child: OtpScreen(
-          phone: state.uri.queryParameters['phone'] ?? '',
+          email: state.uri.queryParameters['email'],
+          phone: state.uri.queryParameters['phone'],
         ),
       ),
     ),
@@ -105,8 +106,8 @@ final _router = GoRouter(
   ],
 );
 
-class AutoMoveApp extends StatelessWidget {
-  const AutoMoveApp({super.key});
+class CarpitalConsultApp extends StatelessWidget {
+  const CarpitalConsultApp({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -187,7 +187,7 @@ class _TrackingContentState extends State<_TrackingContent> {
                 children: [
                   TileLayer(
                     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.automove.app',
+                    userAgentPackageName: 'com.carpitalconsult.app',
                   ),
                   PolylineLayer(
                     polylines: [

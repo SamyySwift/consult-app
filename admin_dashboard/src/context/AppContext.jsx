@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { fetchAdminBookings, fetchAdminDrivers } from '../lib/api';
 
 const AppContext = createContext();
 
@@ -9,7 +9,7 @@ export function AppProvider({ children }) {
   const [currentFilter, setCurrentFilter] = useState('all');
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [liveStatus, setLiveStatus] = useState('connecting');
+  const [liveStatus, setLiveStatus] = useState('live');
 
   // Format date utility
   const formatRelativeTime = (dateStr) => {
@@ -32,7 +32,7 @@ export function AppProvider({ children }) {
   const normalizeStatus = (dbStatus) => {
     if (!dbStatus) return 'pending';
     const s = dbStatus.toLowerCase();
-    if (s === 'delivered') return 'completed';
+    if (s === 'delivered' || s === 'completed') return 'completed';
     if (s === 'pickedup' || s === 'picked_up') return 'pickedUp';
     if (s === 'intransit' || s === 'in_transit') return 'inTransit';
     if (s === 'confirmed') return 'confirmed';
@@ -43,11 +43,7 @@ export function AppProvider({ children }) {
 
   const fetchDrivers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, phone')
-        .eq('role', 'driver');
-      if (error) throw error;
+      const data = await fetchAdminDrivers();
       setDrivers(data || []);
     } catch (err) {
       console.warn('Error loading drivers:', err);
@@ -56,26 +52,18 @@ export function AppProvider({ children }) {
 
   const fetchBookings = async () => {
     try {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          client:profiles!bookings_user_id_fkey(full_name, phone, email),
-          driver:profiles!bookings_driver_id_fkey(full_name, phone)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const data = await fetchAdminBookings();
 
       if (data) {
         const formattedJobs = data.map(b => {
-          const clientName = b.client?.full_name || 'Direct Client';
-          const clientPhone = b.client?.phone || '—';
-          const driverName = b.driver?.full_name || (b.driver_id ? 'Assigned Driver' : 'Unassigned');
+          const clientName = b.client?.full_name || [b.client_first_name, b.client_last_name].filter(Boolean).join(' ') || 'Direct Client';
+          const clientPhone = b.client?.phone || b.client_phone || '—';
+          const driverName = b.driver?.full_name || [b.driver_first_name, b.driver_last_name].filter(Boolean).join(' ') || (b.driver_id ? 'Assigned Driver' : 'Unassigned');
           
           return {
-            id: b.id || b.tracking_number || 'JB00000',
+            id: b.id || b.booking_reference || 'JB00000',
             dbId: b.id,
+            bookingReference: b.booking_reference,
             customerId: b.user_id,
             customerName: clientName,
             customerPhone: clientPhone,
@@ -106,7 +94,7 @@ export function AppProvider({ children }) {
             confirmedAt: b.confirmed_at ? formatRelativeTime(b.confirmed_at) : null,
             pickedUpAt: b.picked_up_at ? formatRelativeTime(b.picked_up_at) : null,
             completedAt: b.completed_at ? formatRelativeTime(b.completed_at) : null,
-            clientAcknowledgedAt: b.completed_at ? formatRelativeTime(b.completed_at) : null,
+            clientAcknowledgedAt: b.client_acknowledged_at ? formatRelativeTime(b.client_acknowledged_at) : null,
             clientSignatureBase64: b.client_signature_url 
               ? (b.client_signature_url.startsWith('data:image') ? b.client_signature_url : `data:image/png;base64,${b.client_signature_url}`) 
               : null,
@@ -116,9 +104,11 @@ export function AppProvider({ children }) {
           };
         });
         setJobs(formattedJobs);
+        setLiveStatus('live');
       }
     } catch (err) {
       console.error('Error fetching live bookings:', err);
+      setLiveStatus('connecting');
     } finally {
       setLoading(false);
     }
@@ -128,25 +118,13 @@ export function AppProvider({ children }) {
     fetchDrivers();
     fetchBookings();
 
-    const channel = supabase
-      .channel('public:admin_command_center')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
-        fetchBookings();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => {
-        fetchDrivers();
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setLiveStatus('live');
-        } else {
-          setLiveStatus('connecting');
-        }
-      });
+    // Auto-refresh poll every 4 seconds for live command center updates
+    const interval = setInterval(() => {
+      fetchDrivers();
+      fetchBookings();
+    }, 4000);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => clearInterval(interval);
   }, []);
 
   const value = {

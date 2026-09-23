@@ -149,7 +149,7 @@ class ProfileScreen extends StatelessWidget {
                         items: [
                           _MenuItem(Icons.description_outlined, 'Terms of Service', '', onTap: () {}),
                           _MenuItem(Icons.privacy_tip_outlined, 'Privacy Policy', '', onTap: () {}),
-                          _MenuItem(Icons.info_outline_rounded, 'About AutoMove v1.0.0', '', onTap: () {}),
+                          _MenuItem(Icons.info_outline_rounded, 'About Carpital Consult v1.0.0', '', onTap: () {}),
                         ],
                       ),
 

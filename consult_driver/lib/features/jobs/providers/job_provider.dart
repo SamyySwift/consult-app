@@ -1,91 +1,72 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:geolocator/geolocator.dart';
 import '../models/job_model.dart';
+import '../../../core/network/api_client.dart';
 
 class JobProvider extends ChangeNotifier {
   List<JobModel> _allJobs = generateMockJobs();
   bool _isLoading = false;
-  RealtimeChannel? _realtimeChannel;
+  Timer? _pollingTimer;
   StreamSubscription<Position>? _positionStream;
 
   List<JobModel> get allJobs => List.unmodifiable(_allJobs);
   bool get isLoading => _isLoading;
 
-  SupabaseClient get _supabase => Supabase.instance.client;
-
   JobProvider() {
     fetchJobs();
-    _subscribeToLiveJobs();
+    _startPolling();
   }
 
   @override
   void dispose() {
-    _realtimeChannel?.unsubscribe();
+    _pollingTimer?.cancel();
     _stopLocationTracking();
     super.dispose();
   }
 
-  /// Subscribe to real-time changes on the bookings table
-  void _subscribeToLiveJobs() {
-    try {
-      _realtimeChannel = _supabase
-          .channel('public:bookings:driver_channel')
-          .onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'bookings',
-            callback: (payload) {
-              debugPrint('Realtime driver bookings event received: ${payload.eventType}');
-              fetchJobs();
-            },
-          )
-          .subscribe();
-    } catch (e) {
-      debugPrint('Error subscribing to driver bookings realtime: $e');
-    }
+  /// Start background polling every 5 seconds to sync live jobs
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      fetchJobs(silent: true);
+    });
   }
 
-  /// Fetch jobs from Supabase
-  Future<void> fetchJobs() async {
-    _isLoading = true;
-    notifyListeners();
+  /// Fetch jobs from Railway API
+  Future<void> fetchJobs({bool silent = false}) async {
+    if (!silent) {
+      _isLoading = true;
+      notifyListeners();
+    }
 
     try {
-      final currentUserId = _supabase.auth.currentUser?.id;
-      var query = _supabase
-          .from('bookings')
-          .select('*, profiles:user_id(full_name, phone)');
+      final res = await ApiClient.instance.get('/api/driver/jobs');
+      if (res.isSuccess && res.data != null) {
+        final List<dynamic> data = res.data as List<dynamic>;
+        final List<JobModel> remoteJobs = data
+            .map((item) => JobModel.fromSupabaseMap(item as Map<String, dynamic>))
+            .toList();
+        _allJobs = remoteJobs;
 
-      // If driver is authenticated, show only their assigned jobs
-      if (currentUserId != null) {
-        query = query.eq('driver_id', currentUserId);
-      }
-
-      final response = await query.order('created_at', ascending: false);
-      final List<dynamic> data = response as List<dynamic>;
-      
-      final List<JobModel> remoteJobs = data
-          .map((item) => JobModel.fromSupabaseMap(item as Map<String, dynamic>))
-          .toList();
-      _allJobs = remoteJobs;
-      
-      // Check if we need to resume location tracking
-      if (hasActiveDelivery && activeJob?.status == JobStatus.inTransit) {
-        _startLocationTracking(activeJob!.id);
-      } else {
-        _stopLocationTracking();
+        // Check if we need to resume location tracking
+        if (hasActiveDelivery && activeJob?.status == JobStatus.inTransit) {
+          _startLocationTracking(activeJob!.id);
+        } else {
+          _stopLocationTracking();
+        }
       }
     } catch (e) {
-      debugPrint('Error fetching jobs from Supabase: $e');
+      debugPrint('Error fetching jobs from Railway API: $e');
       if (_allJobs.isEmpty) {
         _allJobs = generateMockJobs();
       }
     } finally {
-      _isLoading = false;
+      if (!silent) {
+        _isLoading = false;
+      }
       notifyListeners();
     }
   }
@@ -124,12 +105,9 @@ class JobProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _supabase.from('bookings').update({
-        'status': 'confirmed',
-        'confirmed_at': DateTime.now().toIso8601String(),
-      }).eq('id', jobId);
+      await ApiClient.instance.post('/api/driver/jobs/$jobId/accept', {});
     } catch (e) {
-      debugPrint('Supabase confirmJob error: $e');
+      debugPrint('API confirmJob error: $e');
     }
 
     final idx = _allJobs.indexWhere((j) => j.id == jobId);
@@ -159,7 +137,7 @@ class JobProvider extends ChangeNotifier {
       List<String> imageDataUris = [];
       String? audioDataUri;
 
-      // Convert images to base64 data URIs (stored directly in DB)
+      // Convert images to base64 data URIs
       for (int i = 0; i < imageFiles.length; i++) {
         try {
           final file = imageFiles[i];
@@ -169,7 +147,7 @@ class JobProvider extends ChangeNotifier {
           final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
           imageDataUris.add('data:$mime;base64,$base64Str');
         } catch (e) {
-          debugPrint('Image encode $i failed (continuing): $e');
+          debugPrint('Image encode $i failed: $e');
         }
       }
 
@@ -182,18 +160,17 @@ class JobProvider extends ChangeNotifier {
           final mime = ext == 'm4a' ? 'audio/mp4' : 'audio/$ext';
           audioDataUri = 'data:$mime;base64,$base64Str';
         } catch (e) {
-          debugPrint('Audio encode failed (continuing): $e');
+          debugPrint('Audio encode failed: $e');
         }
       }
 
-      // Update the DB — this is the critical part
-      await _supabase.from('bookings').update({
+      // Update via Railway API
+      await ApiClient.instance.post('/api/driver/jobs/$jobId/status', {
         'status': 'pickedUp',
-        'picked_up_at': DateTime.now().toIso8601String(),
-        'pickup_condition_desc': description,
-        if (imageDataUris.isNotEmpty) 'pickup_condition_images': imageDataUris,
-        if (audioDataUri != null) 'pickup_condition_audio': audioDataUri,
-      }).eq('id', jobId);
+        'pickupConditionDesc': description,
+        if (imageDataUris.isNotEmpty) 'pickupConditionImages': imageDataUris,
+        'pickupConditionAudio': ?audioDataUri,
+      });
 
       // Update local state
       final idx = _allJobs.indexWhere((j) => j.id == jobId);
@@ -207,13 +184,12 @@ class JobProvider extends ChangeNotifier {
         );
       }
     } catch (e) {
-      debugPrint('Supabase submitPickupCondition error: $e');
+      debugPrint('API submitPickupCondition error: $e');
       rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
-
   }
 
   /// Advance job through status pipeline: confirmed → pickedUp → inTransit → completed (delivered).
@@ -230,11 +206,9 @@ class JobProvider extends ChangeNotifier {
         break;
       case JobStatus.confirmed:
         statusStr = 'confirmed';
-        updates['confirmed_at'] = DateTime.now().toIso8601String();
         break;
       case JobStatus.pickedUp:
         statusStr = 'pickedUp';
-        updates['picked_up_at'] = DateTime.now().toIso8601String();
         break;
       case JobStatus.inTransit:
         statusStr = 'inTransit';
@@ -242,9 +216,8 @@ class JobProvider extends ChangeNotifier {
         break;
       case JobStatus.completed:
         statusStr = 'delivered';
-        updates['completed_at'] = DateTime.now().toIso8601String();
         if (clientSignatureBase64 != null) {
-          updates['client_signature_url'] = clientSignatureBase64;
+          updates['clientSignatureBase64'] = clientSignatureBase64;
         }
         _stopLocationTracking();
         break;
@@ -257,9 +230,9 @@ class JobProvider extends ChangeNotifier {
     updates['status'] = statusStr;
 
     try {
-      await _supabase.from('bookings').update(updates).eq('id', jobId);
+      await ApiClient.instance.post('/api/driver/jobs/$jobId/status', updates);
     } catch (e) {
-      debugPrint('Supabase updateJobStatus error: $e');
+      debugPrint('API updateJobStatus error: $e');
     }
 
     final idx = _allJobs.indexWhere((j) => j.id == jobId);
@@ -278,7 +251,7 @@ class JobProvider extends ChangeNotifier {
   }
 
   Future<void> _startLocationTracking(String jobId) async {
-    if (_positionStream != null) return; // Already tracking
+    if (_positionStream != null) return;
 
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -296,34 +269,35 @@ class JobProvider extends ChangeNotifier {
     }
 
     if (permission == LocationPermission.deniedForever) {
-      debugPrint('Location permissions are permanently denied, we cannot request permissions.');
+      debugPrint('Location permissions are permanently denied.');
       return;
     }
 
     const LocationSettings locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 50, // update every 50 meters
-      timeLimit: Duration(seconds: 10), // update every 10 seconds
+      distanceFilter: 50,
+      timeLimit: Duration(seconds: 10),
     );
 
     _positionStream = Geolocator.getPositionStream(locationSettings: locationSettings).listen(
       (Position? position) {
         if (position != null) {
-          _updateDriverLocationInSupabase(jobId, position.latitude, position.longitude);
+          _updateDriverLocation(jobId, position.latitude, position.longitude);
         }
       },
     );
   }
 
-  Future<void> _updateDriverLocationInSupabase(String jobId, double lat, double lng) async {
+  Future<void> _updateDriverLocation(String jobId, double lat, double lng) async {
     try {
-      await _supabase.from('bookings').update({
-        'driver_lat': lat,
-        'driver_lng': lng,
-      }).eq('id', jobId);
+      await ApiClient.instance.post('/api/driver/location', {
+        'jobId': jobId,
+        'lat': lat,
+        'lng': lng,
+      });
       debugPrint('Updated driver location: $lat, $lng');
     } catch (e) {
-      debugPrint('Supabase _updateDriverLocationInSupabase error: $e');
+      debugPrint('API _updateDriverLocation error: $e');
     }
   }
 

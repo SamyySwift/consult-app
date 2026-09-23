@@ -490,7 +490,7 @@ function openDocumentModal(type, jobId) {
       <div class="print-doc">
         <div class="doc-header">
           <div>
-            <div class="doc-brand">AUTOMOVE INC.</div>
+            <div class="doc-brand">CARPITAL CONSULT INC.</div>
             <div class="doc-sub">OFFICIAL TRANSPORT MANIFEST & WAYBILL</div>
             <div style="margin-top:20px;"><strong>DOCUMENT NO:</strong> REQ-${job.id}</div>
             <div><strong>ISSUED DATE:</strong> ${job.createdAt}</div>
@@ -511,7 +511,7 @@ function openDocumentModal(type, jobId) {
           <div class="doc-grid">
             <div><span class="label">VEHICLE</span><br/><strong>${job.vehicle.year} ${job.vehicle.make} ${job.vehicle.model}</strong></div>
             <div><span class="label">COLOR</span><br/><strong>${job.vehicle.color}</strong></div>
-            <div><span class="label">VIN / CHASSIS NO.</span><br/><strong>${job.vehicle.vin || 'VIN-VERIFIED-AUTOMOVE'}</strong></div>
+            <div><span class="label">VIN / CHASSIS NO.</span><br/><strong>${job.vehicle.vin || 'VIN-VERIFIED-CARPITAL-CONSULT'}</strong></div>
             <div><span class="label">VEHICLE TYPE</span><br/><strong>${job.vehicle.type}</strong></div>
           </div>
         </div>
@@ -546,7 +546,7 @@ function openDocumentModal(type, jobId) {
       <div class="print-doc">
         <div class="doc-header">
           <div>
-            <div class="doc-brand">AUTOMOVE INC.</div>
+            <div class="doc-brand">CARPITAL CONSULT INC.</div>
             <div class="doc-sub">PROOF OF HANDOVER / DELIVERY CERTIFICATE</div>
             <div style="margin-top:20px;"><strong>CERTIFICATE NO:</strong> POD-${job.id}-CERT</div>
             <div><strong>HANDOVER DATE:</strong> ${job.completedAt || 'Pending'}</div>
@@ -1134,7 +1134,7 @@ function printRecords(type, entityName) {
     <div class="print-doc">
       <div class="doc-header">
         <div>
-          <div class="doc-brand">AUTOMOVE INC.</div>
+          <div class="doc-brand">CARPITAL CONSULT INC.</div>
           <div class="doc-sub">OFFICIAL ${headerTitle}</div>
           <div style="margin-top:20px;"><strong>${subTitle}</strong></div>
           <div><strong>GENERATED ON:</strong> ${new Date().toLocaleDateString()}</div>

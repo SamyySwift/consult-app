@@ -4,7 +4,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
 import '../../../core/theme/driver_colors.dart';
 import '../../../core/widgets/driver_button.dart';
 import '../providers/job_provider.dart';

@@ -61,8 +61,8 @@ final _router = GoRouter(
   ],
 );
 
-class AutoMoveDriverApp extends StatelessWidget {
-  const AutoMoveDriverApp({super.key});
+class CarpitalConsultDriverApp extends StatelessWidget {
+  const CarpitalConsultDriverApp({super.key});
 
   @override
   Widget build(BuildContext context) {

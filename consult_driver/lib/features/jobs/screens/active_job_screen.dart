@@ -54,7 +54,7 @@ class ActiveJobScreen extends StatelessWidget {
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.automove.driver',
+                userAgentPackageName: 'com.carpitalconsult.driver',
               ),
               PolylineLayer(
                 polylines: [

@@ -61,7 +61,7 @@ class OrderRequestDocumentView extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'AUTOMOVE INC.',
+                            'CARPITAL CONSULT INC.',
                             style: TextStyle(
                               color: Colors.black,
                               fontSize: 28,
@@ -186,7 +186,7 @@ class OrderRequestDocumentView extends StatelessWidget {
                         ),
                         const SizedBox(height: 20),
                         const Text(
-                          'AutoMove Inc. applies comprehensive transit policies governed by national logistics laws.\nThis document serves as an official electronic waybill.',
+                          'Carpital Consult Inc. applies comprehensive transit policies governed by national logistics laws.\nThis document serves as an official electronic waybill.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.black38,

@@ -44,20 +44,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final nameParts = _nameCtrl.text.trim().split(' ');
     final firstName = nameParts.isNotEmpty ? nameParts.first : '';
     final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+    final email = _emailCtrl.text.trim();
 
     final auth = context.read<AuthProvider>();
     final success = await auth.register(
       firstName: firstName,
       lastName: lastName.isEmpty ? 'User' : lastName,
-      email: _emailCtrl.text.trim(),
-      phone: '+2348000000000', // Mock phone since it's removed from UI
+      email: email,
+      phone: '',
       password: _passwordCtrl.text,
     );
 
     if (!mounted) return;
     if (success) {
       context.go(
-        '${AppConstants.routeOtp}?phone=${Uri.encodeComponent('+2348000000000')}',
+        '${AppConstants.routeOtp}?email=${Uri.encodeComponent(email)}',
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(auth.errorMessage ?? 'Registration failed. Please try again.'),
+          backgroundColor: context.colors.error,
+        ),
       );
     }
   }

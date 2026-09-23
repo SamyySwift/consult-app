@@ -61,7 +61,7 @@ class ProofOfHandoverDocumentView extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'AUTOMOVE INC.',
+                            'CARPITAL CONSULT INC.',
                             style: TextStyle(
                               color: Colors.black,
                               fontSize: 28,
@@ -217,7 +217,7 @@ class ProofOfHandoverDocumentView extends StatelessWidget {
                           ),
                         const SizedBox(height: 20),
                         const Text(
-                          'AutoMove Inc. digital handover certificate.\nThis document verifies the transfer of possession and condition acknowledgement.',
+                          'Carpital Consult Inc. digital handover certificate.\nThis document verifies the transfer of possession and condition acknowledgement.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.black38,

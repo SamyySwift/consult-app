@@ -17,13 +17,17 @@ class AppRoutes {
 }
 
 class AppConstants {
-  static const String appName = 'AutoMove Driver';
+  static const String appName = 'Carpital Consult Driver';
   static const String appVersion = '1.0.0';
 
   // Supabase Configuration
   static const String supabaseUrl = 'https://ulksjcitenlxtvxwvktw.supabase.co';
   static String get supabaseAnonKey =>
       dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+
+  // Railway API Configuration
+  static String get apiBaseUrl =>
+      dotenv.env['API_BASE_URL'] ?? 'https://carpitalconsult.com';
 
   // Storage Keys
   static const String keyUserData = 'driver_user_data';

@@ -1,5 +1,5 @@
 name: automove_driver
-description: "AutoMove Driver — Vehicle Transport Driver Application"
+description: "Carpital Consult Driver — Vehicle Transport Driver Application"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -27,6 +27,7 @@ dependencies:
   # Storage & Backend
   shared_preferences: ^2.3.3
   supabase_flutter: ^2.8.3
+  http: ^1.2.2
 
   # Utilities
   intl: ^0.19.0

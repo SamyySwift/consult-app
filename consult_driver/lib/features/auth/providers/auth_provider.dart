@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/network/api_client.dart';
 
 class DriverModel {
   final String id;
@@ -37,6 +37,23 @@ class DriverModel {
   String get initials =>
       '${firstName.isNotEmpty ? firstName[0] : ''}${lastName.isNotEmpty ? lastName[0] : ''}'
           .toUpperCase();
+
+  factory DriverModel.fromJson(Map<String, dynamic> json) {
+    return DriverModel(
+      id: json['id']?.toString() ?? '',
+      firstName: json['firstName'] ?? json['first_name'] ?? 'Driver',
+      lastName: json['lastName'] ?? json['last_name'] ?? '',
+      email: json['email'] ?? '',
+      phone: json['phone'] ?? '',
+      licenseNumber: json['licenseNumber'] ?? json['license_number'],
+      vehicleType: json['vehicleType'] ?? json['vehicle_type'],
+      vehiclePlate: json['vehiclePlate'] ?? json['vehicle_plate'],
+      isOnline: json['isOnline'] == true || json['is_online'] == true,
+      isVerified: json['isVerified'] == true || json['is_verified'] == true,
+      rating: ((json['rating'] ?? 5.0) as num).toDouble(),
+      totalJobs: json['totalJobs'] ?? json['total_trips'] ?? 0,
+    );
+  }
 
   factory DriverModel.fromSupabase(
     Map<String, dynamic> profileMap, [
@@ -104,38 +121,14 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   bool _isAuthenticated = false;
-  StreamSubscription<AuthState>? _authSubscription;
 
   DriverModel? get driver => _driver;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _isAuthenticated;
 
-  SupabaseClient get _supabase => Supabase.instance.client;
-
   AuthProvider() {
     _initSession();
-    _listenAuthChanges();
-  }
-
-  @override
-  void dispose() {
-    _authSubscription?.cancel();
-    super.dispose();
-  }
-
-  void _listenAuthChanges() {
-    _authSubscription = _supabase.auth.onAuthStateChange.listen((data) {
-      final session = data.session;
-      final event = data.event;
-      if (session != null) {
-        _fetchDriverProfile(session.user.id, session.user.email ?? '');
-      } else if (event == AuthChangeEvent.signedOut) {
-        _driver = null;
-        _isAuthenticated = false;
-        notifyListeners();
-      }
-    });
   }
 
   Future<void> _initSession() async {
@@ -143,30 +136,26 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final session = _supabase.auth.currentSession;
-      if (session != null) {
-        await _fetchDriverProfile(session.user.id, session.user.email ?? '');
-      } else {
-        final prefs = await SharedPreferences.getInstance();
-        final isLoggedIn = prefs.getBool('driver_logged_in') ?? false;
+      await ApiClient.instance.init();
+      final prefs = await SharedPreferences.getInstance();
+      final isLoggedIn = prefs.getBool('driver_logged_in') ?? false;
 
-        if (isLoggedIn) {
-          final savedId = prefs.getString('driver_id') ?? AppConstants.mockDriverId;
-          _driver = DriverModel(
-            id: savedId,
-            firstName: prefs.getString('driver_first_name') ?? 'Adewale',
-            lastName: prefs.getString('driver_last_name') ?? 'Okonkwo',
-            email: prefs.getString('driver_email') ?? 'driver@automove.com',
-            phone: prefs.getString('driver_phone') ?? '+234 812 345 6789',
-            licenseNumber: prefs.getString('driver_license') ?? 'LG-2023-0048291',
-            vehiclePlate: prefs.getString('driver_plate') ?? 'LND-394-FY',
-            isVerified: true,
-            isOnline: true,
-            rating: 4.9,
-            totalJobs: 52,
-          );
-          _isAuthenticated = true;
-        }
+      if (isLoggedIn) {
+        final savedId = prefs.getString('driver_id') ?? AppConstants.mockDriverId;
+        _driver = DriverModel(
+          id: savedId,
+          firstName: prefs.getString('driver_first_name') ?? 'Adewale',
+          lastName: prefs.getString('driver_last_name') ?? 'Okonkwo',
+          email: prefs.getString('driver_email') ?? 'driver@carpitalconsult.com',
+          phone: prefs.getString('driver_phone') ?? '+234 812 345 6789',
+          licenseNumber: prefs.getString('driver_license') ?? 'LG-2023-0048291',
+          vehiclePlate: prefs.getString('driver_plate') ?? 'LND-394-FY',
+          isVerified: true,
+          isOnline: true,
+          rating: 4.9,
+          totalJobs: 52,
+        );
+        _isAuthenticated = true;
       }
     } catch (e) {
       debugPrint('Driver session init error: $e');
@@ -176,104 +165,51 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _fetchDriverProfile(String userId, String email) async {
-    try {
-      final profileRes = await _supabase
-          .from('profiles')
-          .select()
-          .eq('id', userId)
-          .maybeSingle();
-
-      Map<String, dynamic>? driverRes;
-      try {
-        driverRes = await _supabase
-            .from('drivers')
-            .select()
-            .eq('id', userId)
-            .maybeSingle();
-      } catch (_) {}
-
-      if (profileRes != null) {
-        _driver = DriverModel.fromSupabase(profileRes, driverRes);
-        _isAuthenticated = true;
-      } else {
-        _driver = DriverModel(
-          id: userId,
-          firstName: 'Driver',
-          lastName: '',
-          email: email,
-          phone: '',
-          isVerified: true,
-          isOnline: true,
-          rating: 5.0,
-          totalJobs: 0,
-        );
-        _isAuthenticated = true;
-      }
-    } catch (e) {
-      debugPrint('Error fetching driver profile: $e');
-    }
-    notifyListeners();
-  }
-
   Future<bool> login({required String email, required String password}) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final response = await _supabase.auth.signInWithPassword(
-        email: email.trim(),
-        password: password,
-      );
+      final res = await ApiClient.instance.post('/api/driver/login', {
+        'email': email.trim(),
+        'password': password,
+      });
 
-      if (response.user != null) {
-        await _fetchDriverProfile(response.user!.id, response.user!.email ?? email);
+      if (res.isSuccess && res.data != null) {
+        final data = res.data as Map<String, dynamic>;
+        final token = data['token'] as String?;
+        await ApiClient.instance.setToken(token);
+
+        if (data['driver'] != null) {
+          _driver = DriverModel.fromJson(data['driver'] as Map<String, dynamic>);
+        }
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('driver_logged_in', true);
-        await prefs.setString('driver_id', response.user!.id);
-        await prefs.setString('driver_email', email);
         if (_driver != null) {
+          await prefs.setString('driver_id', _driver!.id);
+          await prefs.setString('driver_email', _driver!.email);
           await prefs.setString('driver_first_name', _driver!.firstName);
           await prefs.setString('driver_last_name', _driver!.lastName);
           await prefs.setString('driver_phone', _driver!.phone);
+          if (_driver!.licenseNumber != null) {
+            await prefs.setString('driver_license', _driver!.licenseNumber!);
+          }
+          if (_driver!.vehiclePlate != null) {
+            await prefs.setString('driver_plate', _driver!.vehiclePlate!);
+          }
         }
 
+        _isAuthenticated = true;
         _isLoading = false;
         notifyListeners();
         return true;
+      } else {
+        _errorMessage = res.errorMessage ?? 'Invalid email or password';
       }
     } catch (e) {
-      // Fallback for demo/offline test
-      if (email.isNotEmpty && password.length >= 6) {
-        _driver = DriverModel(
-          id: AppConstants.mockDriverId,
-          firstName: 'Adewale',
-          lastName: 'Okonkwo',
-          email: email,
-          phone: '+234 812 345 6789',
-          licenseNumber: 'LG-2023-0048291',
-          vehiclePlate: 'LND-394-FY',
-          isVerified: true,
-          isOnline: true,
-          rating: 4.9,
-          totalJobs: 52,
-        );
-        _isAuthenticated = true;
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('driver_logged_in', true);
-        await prefs.setString('driver_id', AppConstants.mockDriverId);
-        await prefs.setString('driver_email', email);
-        await prefs.setString('driver_first_name', _driver!.firstName);
-        await prefs.setString('driver_last_name', _driver!.lastName);
-        await prefs.setString('driver_phone', _driver!.phone);
-
-        _isLoading = false;
-        notifyListeners();
-        return true;
-      }
+      debugPrint('Driver login error: $e');
       _errorMessage = e.toString();
     }
 
@@ -288,97 +224,54 @@ class AuthProvider extends ChangeNotifier {
     required String email,
     required String phone,
     required String password,
+    String? licenseNumber,
+    String? vehicleType,
+    String? vehiclePlate,
   }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final response = await _supabase.auth.signUp(
-        email: email.trim(),
-        password: password,
-        data: {
-          'full_name': '$firstName $lastName'.trim(),
-          'phone': phone.trim(),
-          'role': 'driver',
-        },
-      );
+      final res = await ApiClient.instance.post('/api/driver/register', {
+        'firstName': firstName.trim(),
+        'lastName': lastName.trim(),
+        'email': email.trim(),
+        'phone': phone.trim(),
+        'password': password,
+        'licenseNumber': licenseNumber ?? '',
+        'vehicleType': vehicleType ?? 'Tow Truck',
+        'vehiclePlate': vehiclePlate ?? '',
+      });
 
-      final user = response.user;
-      if (user != null) {
-        try {
-          await _supabase.from('profiles').upsert({
-            'id': user.id,
-            'email': email.trim(),
-            'first_name': firstName.trim(),
-            'last_name': lastName.trim(),
-            'phone': phone.trim(),
-            'role': 'driver',
-          });
+      if (res.isSuccess && res.data != null) {
+        final data = res.data as Map<String, dynamic>;
+        final token = data['token'] as String?;
+        await ApiClient.instance.setToken(token);
 
-          await _supabase.from('drivers').upsert({
-            'id': user.id,
-            'status': 'available',
-            'rating': 5.0,
-            'total_trips': 0,
-          });
-        } catch (e) {
-          debugPrint('Error inserting driver record: $e');
+        if (data['driver'] != null) {
+          _driver = DriverModel.fromJson(data['driver'] as Map<String, dynamic>);
         }
 
-        _driver = DriverModel(
-          id: user.id,
-          firstName: firstName,
-          lastName: lastName,
-          email: email,
-          phone: phone,
-          isVerified: true,
-          isOnline: true,
-          rating: 5.0,
-          totalJobs: 0,
-        );
-        _isAuthenticated = true;
-
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('driver_logged_in', true);
-        await prefs.setString('driver_id', user.id);
-        await prefs.setString('driver_email', email);
-        await prefs.setString('driver_first_name', firstName);
-        await prefs.setString('driver_last_name', lastName);
-        await prefs.setString('driver_phone', phone);
+        if (_driver != null) {
+          await prefs.setString('driver_id', _driver!.id);
+          await prefs.setString('driver_email', _driver!.email);
+          await prefs.setString('driver_first_name', firstName);
+          await prefs.setString('driver_last_name', lastName);
+          await prefs.setString('driver_phone', phone);
+        }
 
+        _isAuthenticated = true;
         _isLoading = false;
         notifyListeners();
         return true;
+      } else {
+        _errorMessage = res.errorMessage ?? 'Registration failed';
       }
     } catch (e) {
-      if (email.isNotEmpty && password.length >= 6) {
-        final mockId = 'drv_${DateTime.now().millisecondsSinceEpoch}';
-        _driver = DriverModel(
-          id: mockId,
-          firstName: firstName,
-          lastName: lastName,
-          email: email,
-          phone: phone,
-          isVerified: true,
-          isOnline: true,
-          rating: 5.0,
-          totalJobs: 0,
-        );
-        _isAuthenticated = true;
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('driver_logged_in', true);
-        await prefs.setString('driver_id', mockId);
-        await prefs.setString('driver_email', email);
-        await prefs.setString('driver_first_name', firstName);
-        await prefs.setString('driver_last_name', lastName);
-        await prefs.setString('driver_phone', phone);
-
-        _isLoading = false;
-        notifyListeners();
-        return true;
-      }
+      debugPrint('Driver register error: $e');
       _errorMessage = e.toString();
     }
 
@@ -390,7 +283,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> verifyOtp(String otp) async {
     _isLoading = true;
     notifyListeners();
-    await Future.delayed(const Duration(milliseconds: 1200));
+    await Future.delayed(const Duration(milliseconds: 600));
     final success = otp.length == 6;
     _isLoading = false;
     notifyListeners();
@@ -398,9 +291,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    try {
-      await _supabase.auth.signOut();
-    } catch (_) {}
+    await ApiClient.instance.setToken(null);
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
     _driver = null;
@@ -415,7 +306,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _supabase.from('drivers').update({'status': newStatus ? 'available' : 'offline'}).eq('id', _driver!.id);
+      ApiClient.instance.post('/api/driver/status', {
+        'driverId': _driver!.id,
+        'isOnline': newStatus,
+      });
     } catch (_) {}
   }
 
@@ -435,25 +329,6 @@ class AuthProvider extends ChangeNotifier {
       vehiclePlate: vehiclePlate,
     );
     notifyListeners();
-
-    try {
-      final profileUpdates = <String, dynamic>{};
-      if (firstName != null) profileUpdates['first_name'] = firstName;
-      if (lastName != null) profileUpdates['last_name'] = lastName;
-      if (phone != null) profileUpdates['phone'] = phone;
-
-      if (profileUpdates.isNotEmpty) {
-        await _supabase.from('profiles').update(profileUpdates).eq('id', _driver!.id);
-      }
-
-      final driverUpdates = <String, dynamic>{};
-      if (licenseNumber != null) driverUpdates['license_number'] = licenseNumber;
-      if (vehiclePlate != null) driverUpdates['vehicle_plate'] = vehiclePlate;
-
-      if (driverUpdates.isNotEmpty) {
-        await _supabase.from('drivers').update(driverUpdates).eq('id', _driver!.id);
-      }
-    } catch (_) {}
 
     final prefs = await SharedPreferences.getInstance();
     if (firstName != null) await prefs.setString('driver_first_name', firstName);

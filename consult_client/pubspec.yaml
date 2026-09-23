@@ -1,5 +1,5 @@
 name: consult_logistics
-description: "AutoMove - Automotive Logistics Customer App"
+description: "Carpital Consult - Automotive Logistics Customer App"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -39,6 +39,7 @@ dependencies:
   cached_network_image: ^3.4.1
 
   # Storage & Utils
+  http: ^1.2.2
   shared_preferences: ^2.3.2
   intl: ^0.20.2
   url_launcher: ^6.3.0

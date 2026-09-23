@@ -1,16 +1,14 @@
-import 'dart:io';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/booking_model.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/network/api_client.dart';
 
 class BookingProvider extends ChangeNotifier {
-  final SupabaseClient _supabase = Supabase.instance.client;
-
   // The wizard draft being built
   BookingDraft _draft = BookingDraft();
 
-  // All submitted bookings from Supabase
+  // All submitted bookings from API
   List<BookingModel> _bookings = [];
 
   // Current wizard step (0–6)
@@ -19,7 +17,7 @@ class BookingProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isSubmitting = false;
   String? _errorMessage;
-  RealtimeChannel? _realtimeChannel;
+  Timer? _pollingTimer;
 
   BookingDraft get draft => _draft;
   List<BookingModel> get bookings => List.unmodifiable(_bookings);
@@ -43,96 +41,45 @@ class BookingProvider extends ChangeNotifier {
   static const String defaultDemoClientId = 'b0000000-0000-0000-0000-000000000001';
 
   BookingProvider() {
-    _initAuthListener();
+    fetchBookings();
+    _startPolling();
   }
 
-  void _initAuthListener() {
-    final user = _supabase.auth.currentUser;
-    final uid = user?.id ?? defaultDemoClientId;
-    fetchBookings(uid);
-    subscribeToBookings(uid);
-
-    _supabase.auth.onAuthStateChange.listen((data) {
-      final user = data.session?.user;
-      if (user != null) {
-        fetchBookings(user.id);
-        subscribeToBookings(user.id);
-      } else {
-        fetchBookings(defaultDemoClientId);
-        subscribeToBookings(defaultDemoClientId);
-      }
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      fetchBookings(silent: true);
     });
   }
 
-  /// Fetch bookings from Supabase
-  Future<void> fetchBookings([String? userId]) async {
-    final uid = userId ?? _supabase.auth.currentUser?.id ?? defaultDemoClientId;
-
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      final data = await _supabase
-          .from('bookings')
-          .select()
-          .eq('user_id', uid)
-          .order('created_at', ascending: false);
-
-      _bookings = (data as List)
-          .map((json) => BookingModel.fromSupabaseMap(json as Map<String, dynamic>))
-          .toList();
-    } catch (e) {
-      debugPrint('Error fetching bookings from Supabase: $e');
-      _errorMessage = 'Failed to load bookings: $e';
-    } finally {
-      _isLoading = false;
+  /// Fetch bookings from Railway API
+  Future<void> fetchBookings({String? userId, bool silent = false}) async {
+    if (!silent) {
+      _isLoading = true;
+      _errorMessage = null;
       notifyListeners();
     }
-  }
 
-  /// Subscribe to real-time status and tracking updates
-  void subscribeToBookings(String userId) {
-    unsubscribeFromBookings();
+    try {
+      final endpoint = userId != null ? '/api/bookings?userId=$userId' : '/api/bookings';
+      final res = await ApiClient.instance.get(endpoint);
 
-    _realtimeChannel = _supabase
-        .channel('public:bookings:user_$userId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'bookings',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: userId,
-          ),
-          callback: (payload) {
-            final record = payload.newRecord;
-            if (record.isNotEmpty) {
-              final updatedBooking = BookingModel.fromSupabaseMap(record);
-              final index = _bookings.indexWhere((b) => b.id == updatedBooking.id);
-              if (index >= 0) {
-                _bookings[index] = updatedBooking;
-              } else {
-                _bookings.insert(0, updatedBooking);
-              }
-              notifyListeners();
-            } else if (payload.eventType == PostgresChangeEvent.delete) {
-              final deletedId = payload.oldRecord['id'] as String?;
-              if (deletedId != null) {
-                _bookings.removeWhere((b) => b.id == deletedId);
-                notifyListeners();
-              }
-            }
-          },
-        )
-        .subscribe();
-  }
-
-  void unsubscribeFromBookings() {
-    if (_realtimeChannel != null) {
-      _supabase.removeChannel(_realtimeChannel!);
-      _realtimeChannel = null;
+      if (res.isSuccess && res.data != null) {
+        final List<dynamic> data = res.data as List<dynamic>;
+        _bookings = data
+            .map((json) => BookingModel.fromSupabaseMap(json as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching bookings from API: $e');
+      if (!silent) {
+        _errorMessage = 'Failed to load bookings: $e';
+      }
+    } finally {
+      if (!silent) {
+        _isLoading = false;
+      }
+      notifyListeners();
     }
   }
 
@@ -173,106 +120,91 @@ class BookingProvider extends ChangeNotifier {
   }
 
   void updatePickup({
-    String? address,
-    double? lat,
-    double? lng,
-    DateTime? dateTime,
+    required String address,
+    required double lat,
+    required double lng,
+    required DateTime dateTime,
   }) {
-    _draft.pickupAddress = address ?? _draft.pickupAddress;
-    _draft.pickupLat = lat ?? _draft.pickupLat;
-    _draft.pickupLng = lng ?? _draft.pickupLng;
-    _draft.pickupDateTime = dateTime ?? _draft.pickupDateTime;
+    _draft.pickupAddress = address;
+    _draft.pickupLat = lat;
+    _draft.pickupLng = lng;
+    _draft.pickupDateTime = dateTime;
     notifyListeners();
   }
 
-  void updateDropoff({String? address, double? lat, double? lng}) {
-    _draft.dropoffAddress = address ?? _draft.dropoffAddress;
-    _draft.dropoffLat = lat ?? _draft.dropoffLat;
-    _draft.dropoffLng = lng ?? _draft.dropoffLng;
+  void updateDropoff({
+    required String address,
+    required double lat,
+    required double lng,
+  }) {
+    _draft.dropoffAddress = address;
+    _draft.dropoffLat = lat;
+    _draft.dropoffLng = lng;
     notifyListeners();
   }
 
-  void updateServiceType(ServiceType type, double basePrice) {
-    _draft.serviceType = type;
-    _draft.basePrice = basePrice;
+  void updateServiceType(ServiceType serviceType, [double? basePrice]) {
+    _draft.serviceType = serviceType;
+    if (basePrice != null) _draft.basePrice = basePrice;
     notifyListeners();
   }
 
-  void updateTransportMode(TransportMode mode, double enclosedAddon) {
-    _draft.transportMode = mode;
-    _draft.enclosedAddon = enclosedAddon;
+  void updateTransportMode(TransportMode transportMode, [double? enclosedAddon]) {
+    _draft.transportMode = transportMode;
+    if (enclosedAddon != null) _draft.enclosedAddon = enclosedAddon;
     notifyListeners();
   }
 
-  void updateInsurance(bool hasInsurance, double insuranceAmount) {
+  void updateInsurance(bool hasInsurance, [double? insuranceAmount]) {
     _draft.hasInsurance = hasInsurance;
-    _draft.insuranceAmount = insuranceAmount;
+    if (insuranceAmount != null) _draft.insuranceAmount = insuranceAmount;
     notifyListeners();
   }
 
   void addDocument(String path) {
-    _draft.documentPaths.add(path);
-    notifyListeners();
+    if (!_draft.documentPaths.contains(path)) {
+      _draft.documentPaths.add(path);
+      notifyListeners();
+    }
   }
 
   void removeDocument(int index) {
-    _draft.documentPaths.removeAt(index);
-    notifyListeners();
+    if (index >= 0 && index < _draft.documentPaths.length) {
+      _draft.documentPaths.removeAt(index);
+      notifyListeners();
+    }
   }
 
-  /// Submit booking to Supabase
+  /// Submit the booking draft to Railway API
   Future<BookingModel?> submitBooking(String userId) async {
     _isSubmitting = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      // 1. Upload local documents if any
-      final uploadedUrls = <String>[];
-      for (final docPath in _draft.documentPaths) {
-        if (docPath.startsWith('http://') || docPath.startsWith('https://')) {
-          uploadedUrls.add(docPath);
-        } else if (!kIsWeb && File(docPath).existsSync()) {
-          try {
-            final file = File(docPath);
-            final fileName = '${userId}_${DateTime.now().millisecondsSinceEpoch}_${docPath.split('/').last}';
-            await _supabase.storage.from('documents').upload(fileName, file);
-            final publicUrl = _supabase.storage.from('documents').getPublicUrl(fileName);
-            uploadedUrls.add(publicUrl);
-          } catch (storageError) {
-            debugPrint('Document upload notice: $storageError');
-            uploadedUrls.add(docPath);
-          }
-        } else {
-          uploadedUrls.add(docPath);
-        }
-      }
-
-      _draft.documentPaths = uploadedUrls;
-
-      // 2. Insert booking record into Supabase
       final insertMap = _draft.toSupabaseInsertMap(userId);
-      final response = await _supabase
-          .from('bookings')
-          .insert(insertMap)
-          .select()
-          .single();
+      final res = await ApiClient.instance.post('/api/bookings', insertMap);
 
-      final booking = BookingModel.fromSupabaseMap(response);
+      if (res.isSuccess && res.data != null) {
+        final resData = res.data as Map<String, dynamic>;
+        final bookingJson = (resData['booking'] ?? resData) as Map<String, dynamic>;
+        final booking = BookingModel.fromSupabaseMap(bookingJson);
 
-      // Check if already in list via realtime, otherwise insert
-      if (!_bookings.any((b) => b.id == booking.id)) {
-        _bookings.insert(0, booking);
+        if (!_bookings.any((b) => b.id == booking.id)) {
+          _bookings.insert(0, booking);
+        }
+
+        _isSubmitting = false;
+        _draft = BookingDraft();
+        _currentStep = 0;
+        notifyListeners();
+
+        return booking;
+      } else {
+        throw Exception(res.errorMessage ?? 'Failed to submit booking');
       }
-
-      _isSubmitting = false;
-      _draft = BookingDraft(); // Reset draft
-      _currentStep = 0;
-      notifyListeners();
-
-      return booking;
     } catch (e) {
-      debugPrint('Error submitting booking to Supabase: $e');
+      debugPrint('Error submitting booking to API: $e');
       _errorMessage = 'Failed to submit booking: $e';
       _isSubmitting = false;
       notifyListeners();
@@ -280,39 +212,39 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
-  /// Cancel booking
+  /// Cancel booking via Railway API
   Future<bool> cancelBooking(String bookingId) async {
     try {
-      await _supabase
-          .from('bookings')
-          .update({'status': 'cancelled'})
-          .eq('id', bookingId);
+      final res = await ApiClient.instance.post('/api/bookings/$bookingId/cancel', {});
 
-      final index = _bookings.indexWhere((b) => b.id == bookingId);
-      if (index >= 0) {
-        final b = _bookings[index];
-        _bookings[index] = BookingModel(
-          id: b.id,
-          userId: b.userId,
-          vehicle: b.vehicle,
-          pickup: b.pickup,
-          dropoff: b.dropoff,
-          serviceType: b.serviceType,
-          transportMode: b.transportMode,
-          hasInsurance: b.hasInsurance,
-          documentPaths: b.documentPaths,
-          basePrice: b.basePrice,
-          insuranceFee: b.insuranceFee,
-          totalAmount: b.totalAmount,
-          status: BookingStatusEnum.cancelled,
-          createdAt: b.createdAt,
-          driverName: b.driverName,
-          driverPhone: b.driverPhone,
-          paymentReference: b.paymentReference,
-        );
-        notifyListeners();
+      if (res.isSuccess) {
+        final index = _bookings.indexWhere((b) => b.id == bookingId);
+        if (index >= 0) {
+          final b = _bookings[index];
+          _bookings[index] = BookingModel(
+            id: b.id,
+            userId: b.userId,
+            vehicle: b.vehicle,
+            pickup: b.pickup,
+            dropoff: b.dropoff,
+            serviceType: b.serviceType,
+            transportMode: b.transportMode,
+            hasInsurance: b.hasInsurance,
+            documentPaths: b.documentPaths,
+            basePrice: b.basePrice,
+            insuranceFee: b.insuranceFee,
+            totalAmount: b.totalAmount,
+            status: BookingStatusEnum.cancelled,
+            createdAt: b.createdAt,
+            driverName: b.driverName,
+            driverPhone: b.driverPhone,
+            paymentReference: b.paymentReference,
+          );
+          notifyListeners();
+        }
+        return true;
       }
-      return true;
+      return false;
     } catch (e) {
       debugPrint('Error cancelling booking: $e');
       return false;
@@ -327,7 +259,7 @@ class BookingProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    unsubscribeFromBookings();
+    _pollingTimer?.cancel();
     super.dispose();
   }
 }

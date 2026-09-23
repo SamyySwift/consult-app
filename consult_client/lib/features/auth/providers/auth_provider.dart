@@ -1,14 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/network/api_client.dart';
 
 enum AuthStatus { initial, loading, authenticated, unauthenticated, error }
 
 class AuthProvider extends ChangeNotifier {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final ApiClient _api = ApiClient.instance;
 
   AuthStatus _status = AuthStatus.initial;
   UserModel? _user;
@@ -28,45 +28,22 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _initializeAuth() async {
     try {
-      final session = _supabase.auth.currentSession;
-      final currentUser = _supabase.auth.currentUser;
+      await _api.init();
 
-      if (session != null && currentUser != null) {
-        await _fetchAndSetUserProfile(currentUser);
-        _status = AuthStatus.authenticated;
-      } else {
-        // Check cached local user fallback
-        final prefs = await SharedPreferences.getInstance();
-        final userData = prefs.getString(AppConstants.keyUserData);
-        if (userData != null) {
-          try {
-            _user = UserModel.fromJson(jsonDecode(userData) as Map<String, dynamic>);
-            _status = AuthStatus.authenticated;
-          } catch (_) {
-            _status = AuthStatus.unauthenticated;
-          }
-        } else {
-          _status = AuthStatus.unauthenticated;
-        }
-      }
-
-      // Listen to auth state changes from Supabase
-      _supabase.auth.onAuthStateChange.listen((data) async {
-        final AuthChangeEvent event = data.event;
-        final Session? newSession = data.session;
-
-        if (event == AuthChangeEvent.signedIn && newSession != null) {
-          await _fetchAndSetUserProfile(newSession.user);
+      if (_api.token != null && _api.token!.isNotEmpty) {
+        // Fetch current profile from Railway backend
+        final res = await _api.get('/api/auth/me');
+        if (res.isSuccess && res.data is Map) {
+          _user = UserModel.fromJson(res.data as Map<String, dynamic>);
           _status = AuthStatus.authenticated;
-          notifyListeners();
-        } else if (event == AuthChangeEvent.signedOut) {
-          _user = null;
-          _status = AuthStatus.unauthenticated;
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.remove(AppConstants.keyUserData);
-          notifyListeners();
+          await _saveUser();
+        } else {
+          // Token expired or server unreachable, fallback to cached user
+          await _loadCachedUser();
         }
-      });
+      } else {
+        await _loadCachedUser();
+      }
     } catch (e) {
       debugPrint('Auth initialization error: $e');
       _status = AuthStatus.unauthenticated;
@@ -76,74 +53,47 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _fetchAndSetUserProfile(User sbUser) async {
-    try {
-      final res = await _supabase
-          .from('profiles')
-          .select()
-          .eq('id', sbUser.id)
-          .maybeSingle();
-
-      if (res != null) {
-        _user = UserModel.fromJson(res);
-      } else {
-        // Fallback to metadata
-        final meta = sbUser.userMetadata ?? {};
-        _user = UserModel(
-          id: sbUser.id,
-          firstName: meta['first_name'] as String? ?? sbUser.email?.split('@').first ?? 'User',
-          lastName: meta['last_name'] as String? ?? '',
-          email: sbUser.email ?? '',
-          phone: meta['phone'] as String? ?? sbUser.phone ?? '',
-          createdAt: DateTime.tryParse(sbUser.createdAt) ?? DateTime.now(),
-        );
-
-        // Upsert into public.profiles
-        await _supabase.from('profiles').upsert(_user!.toSupabaseMap());
+  Future<void> _loadCachedUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userData = prefs.getString(AppConstants.keyUserData);
+    if (userData != null) {
+      try {
+        _user = UserModel.fromJson(jsonDecode(userData) as Map<String, dynamic>);
+        _status = AuthStatus.authenticated;
+      } catch (_) {
+        _status = AuthStatus.unauthenticated;
       }
-      await _saveUser();
-    } catch (e) {
-      debugPrint('Error fetching user profile: $e');
-      _user = UserModel(
-        id: sbUser.id,
-        firstName: sbUser.email?.split('@').first ?? 'User',
-        lastName: '',
-        email: sbUser.email ?? '',
-        phone: '',
-        createdAt: DateTime.now(),
-      );
+    } else {
+      _status = AuthStatus.unauthenticated;
     }
   }
 
-  /// Real Supabase login
+  /// Login via Railway API
   Future<bool> login({required String email, required String password}) async {
     _status = AuthStatus.loading;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final response = await _supabase.auth.signInWithPassword(
-        email: email.trim(),
-        password: password,
-      );
+      final res = await _api.post('/api/auth/login', {
+        'email': email.trim(),
+        'password': password,
+      });
 
-      final user = response.user;
-      if (user != null) {
-        await _fetchAndSetUserProfile(user);
+      if (res.isSuccess && res.data is Map) {
+        final data = res.data as Map<String, dynamic>;
+        await _api.setToken(data['token'] as String?);
+        _user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
+        await _saveUser();
         _status = AuthStatus.authenticated;
         notifyListeners();
         return true;
       } else {
         _status = AuthStatus.error;
-        _errorMessage = 'Unable to sign in. Please try again.';
+        _errorMessage = res.errorMessage ?? 'Unable to sign in. Please try again.';
         notifyListeners();
         return false;
       }
-    } on AuthException catch (e) {
-      _status = AuthStatus.error;
-      _errorMessage = e.message;
-      notifyListeners();
-      return false;
     } catch (e) {
       _status = AuthStatus.error;
       _errorMessage = 'An unexpected error occurred. Please try again.';
@@ -152,7 +102,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Real Supabase registration
+  /// Registration via Railway API
   Future<bool> register({
     required String firstName,
     required String lastName,
@@ -165,49 +115,32 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _supabase.auth.signUp(
-        email: email.trim(),
-        password: password,
-        data: {
-          'first_name': firstName,
-          'last_name': lastName,
-          'phone': phone,
-          'role': 'client',
-        },
-      );
+      final res = await _api.post('/api/auth/register', {
+        'firstName': firstName.trim(),
+        'lastName': lastName.trim(),
+        'email': email.trim(),
+        'phone': phone.trim(),
+        'password': password,
+      });
 
-      final user = response.user;
-      if (user != null) {
+      if (res.isSuccess) {
         _user = UserModel(
-          id: user.id,
-          firstName: firstName,
-          lastName: lastName,
+          id: (res.data is Map ? res.data['userId'] : null) ?? '',
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
           email: email.trim(),
-          phone: phone,
+          phone: phone.trim(),
           createdAt: DateTime.now(),
         );
-
-        // If session exists (email confirmation disabled or auto-confirmed)
-        if (response.session != null) {
-          await _saveUser();
-          _status = AuthStatus.authenticated;
-        } else {
-          _status = AuthStatus.unauthenticated;
-        }
-
+        _status = AuthStatus.unauthenticated;
         notifyListeners();
         return true;
       } else {
         _status = AuthStatus.error;
-        _errorMessage = 'Sign up failed. Please try again.';
+        _errorMessage = res.errorMessage ?? 'Sign up failed. Please try again.';
         notifyListeners();
         return false;
       }
-    } on AuthException catch (e) {
-      _status = AuthStatus.error;
-      _errorMessage = e.message;
-      notifyListeners();
-      return false;
     } catch (e) {
       _status = AuthStatus.error;
       _errorMessage = 'Sign up error: $e';
@@ -216,46 +149,40 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Real Supabase OTP verify
+  /// OTP verification via Railway API
   Future<bool> verifyOtp(String otp, {String? email}) async {
     _status = AuthStatus.loading;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final targetEmail = email ?? _user?.email;
-      if (targetEmail != null && targetEmail.isNotEmpty) {
-        final response = await _supabase.auth.verifyOTP(
-          type: OtpType.signup,
-          token: otp,
-          email: targetEmail,
-        );
-
-        if (response.user != null) {
-          await _fetchAndSetUserProfile(response.user!);
-          _status = AuthStatus.authenticated;
-          notifyListeners();
-          return true;
-        }
+      final targetEmail = (email != null && email.isNotEmpty) ? email.trim() : _user?.email;
+      if (targetEmail == null || targetEmail.isEmpty) {
+        _status = AuthStatus.unauthenticated;
+        _errorMessage = 'No email address found to verify.';
+        notifyListeners();
+        return false;
       }
 
-      // If already logged in locally
-      if (_user != null) {
+      final res = await _api.post('/api/auth/verify-otp', {
+        'email': targetEmail,
+        'otp': otp.trim(),
+      });
+
+      if (res.isSuccess && res.data is Map) {
+        final data = res.data as Map<String, dynamic>;
+        await _api.setToken(data['token'] as String?);
+        _user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
         await _saveUser();
         _status = AuthStatus.authenticated;
         notifyListeners();
         return true;
+      } else {
+        _status = AuthStatus.unauthenticated;
+        _errorMessage = res.errorMessage ?? 'Invalid verification code.';
+        notifyListeners();
+        return false;
       }
-
-      _status = AuthStatus.unauthenticated;
-      _errorMessage = 'Invalid OTP. Please try again.';
-      notifyListeners();
-      return false;
-    } on AuthException catch (e) {
-      _status = AuthStatus.unauthenticated;
-      _errorMessage = e.message;
-      notifyListeners();
-      return false;
     } catch (e) {
       _status = AuthStatus.unauthenticated;
       _errorMessage = 'Invalid verification code.';
@@ -264,28 +191,30 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> sendPasswordResetOtp(String email) async {
-    try {
-      await _supabase.auth.resetPasswordForEmail(email.trim());
-      return true;
-    } on AuthException catch (e) {
-      _errorMessage = e.message;
-      notifyListeners();
-      return false;
-    } catch (_) {
-      return false;
-    }
-  }
+  /// Resend Signup OTP via Railway API (triggers Resend)
+  Future<bool> resendOtp(String email) async {
+    _status = AuthStatus.loading;
+    _errorMessage = null;
+    notifyListeners();
 
-  Future<bool> resetPassword({required String otp, required String newPassword}) async {
     try {
-      await _supabase.auth.updateUser(UserAttributes(password: newPassword));
-      return true;
-    } on AuthException catch (e) {
-      _errorMessage = e.message;
+      final res = await _api.post('/api/auth/resend-otp', {
+        'email': email.trim(),
+      });
+
+      _status = AuthStatus.unauthenticated;
+      if (res.isSuccess) {
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = res.errorMessage ?? 'Failed to resend code.';
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _status = AuthStatus.unauthenticated;
+      _errorMessage = 'Failed to resend code: $e';
       notifyListeners();
-      return false;
-    } catch (_) {
       return false;
     }
   }
@@ -298,31 +227,12 @@ class AuthProvider extends ChangeNotifier {
       phone: phone,
       avatarUrl: avatarUrl,
     );
-
-    try {
-      final updates = <String, dynamic>{};
-      if (firstName != null) updates['first_name'] = firstName;
-      if (lastName != null) updates['last_name'] = lastName;
-      if (phone != null) updates['phone'] = phone;
-      if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
-
-      if (updates.isNotEmpty) {
-        await _supabase.from('profiles').update(updates).eq('id', _user!.id);
-      }
-    } catch (e) {
-      debugPrint('Error updating profile in Supabase: $e');
-    }
-
     await _saveUser();
     notifyListeners();
   }
 
   Future<void> logout() async {
-    try {
-      await _supabase.auth.signOut();
-    } catch (e) {
-      debugPrint('Error signing out: $e');
-    }
+    await _api.setToken(null);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.keyUserData);
     await prefs.remove(AppConstants.keyAuthToken);

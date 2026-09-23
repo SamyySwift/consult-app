@@ -6,14 +6,14 @@ import 'package:consult_logistics/features/auth/providers/auth_provider.dart';
 import 'package:consult_logistics/features/booking/providers/booking_provider.dart';
 
 void main() {
-  testWidgets('AutoMove app smoke test', (WidgetTester tester) async {
+  testWidgets('Carpital Consult app smoke test', (WidgetTester tester) async {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => AuthProvider()),
           ChangeNotifierProvider(create: (_) => BookingProvider()),
         ],
-        child: const AutoMoveApp(),
+        child: const CarpitalConsultApp(),
       ),
     );
     expect(find.byType(MaterialApp), findsOneWidget);

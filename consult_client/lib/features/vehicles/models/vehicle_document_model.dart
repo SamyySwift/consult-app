@@ -72,7 +72,7 @@ class OrderRequestDocument {
 
   factory OrderRequestDocument.fromBooking(
     BookingModel booking, {
-    String clientName = 'AutoMove Client',
+    String clientName = 'Carpital Consult Client',
     String clientPhone = '+234 800 000 0000',
   }) {
     return OrderRequestDocument(
@@ -86,7 +86,7 @@ class OrderRequestDocument {
       vehicleColor: booking.vehicle.color,
       vehicleVin: booking.vehicle.vin.isNotEmpty
           ? booking.vehicle.vin
-          : 'VIN-VERIFIED-AUTOMOVE',
+          : 'VIN-VERIFIED-CARPITAL-CONSULT',
       vehicleType: booking.vehicle.typeLabel,
       clientName: clientName,
       clientPhone: clientPhone,

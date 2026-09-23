@@ -13,7 +13,7 @@ void main() {
           ChangeNotifierProvider(create: (_) => AuthProvider()),
           ChangeNotifierProvider(create: (_) => JobProvider()),
         ],
-        child: const AutoMoveDriverApp(),
+        child: const CarpitalConsultDriverApp(),
       ),
     );
     expect(find.byType(MaterialApp), findsOneWidget);

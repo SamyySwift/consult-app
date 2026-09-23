@@ -44,7 +44,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => PricingProvider()),
       ],
-      child: const AutoMoveApp(),
+      child: const CarpitalConsultApp(),
     ),
   );
 }
