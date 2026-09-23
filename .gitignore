@@ -34,3 +34,7 @@ build/
 .vscode/
 *.swp
 *.swo
+
+# Secrets / Config
+.env
+.env.*
