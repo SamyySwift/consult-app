@@ -35,6 +35,4 @@ build/
 *.swp
 *.swo
 
-# Secrets / Config
 .env
-.env.*
