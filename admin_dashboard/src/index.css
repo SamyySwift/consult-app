@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #080E1C;
+  --color-navy-mid: #0D1829;
+  --color-navy-light: #162038;
+  --color-navy-border: #1E2D45;
+  --color-accent-red: #EF3A47;
+  --color-accent-red-dark: #C8303B;
+  --color-amber: #C9913A;
+  --color-amber-glow: rgba(201,145,58,.15);
+  --color-text-primary: #F0F4FF;
+  --color-text-mid: #7B8EAB;
+  --color-text-dim: #3D5070;
+  --color-success: #22C55E;
+  --color-success-bg: rgba(34,197,94,.12);
+  --color-warning: #F59E0B;
+  --color-warning-bg: rgba(245,158,11,.12);
+  --color-info: #3B82F6;
+  --color-info-bg: rgba(59,130,246,.12);
+  --color-error-bg: rgba(239,58,71,.12);
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-syne: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+  
+  --spacing-sidebar-w: 64px;
+  --spacing-sidebar-expanded-w: 220px;
+  --spacing-topbar-h: 60px;
+}
+
+@layer base {
+  :root {
+    --transition: 220ms cubic-bezier(.4,0,.2,1);
+  }
+
+  html, body, #root {
+    @apply h-full w-full overflow-hidden bg-navy text-text-primary font-sans text-[14px];
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-navy-border); border-radius: 4px; }
+
+/* Custom Animations */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .5; transform: scale(.7); }
+}
+
+@keyframes shimmer-line {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes kpi-enter {
+  0%   { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes card-enter {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes transit-shimmer {
+  to { left: 140%; }
+}
+
+.animate-pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+.animate-pulse-dot-fast { animation: pulse-dot 1.5s ease-in-out infinite; }
+.animate-kpi-enter { animation: kpi-enter .5s ease forwards; }
+.animate-card-enter { animation: card-enter .4s ease forwards; }
+
+.shimmer-line-before::before {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-amber), transparent);
+  animation: shimmer-line 3s ease-in-out infinite;
+}
+
+.in-transit-before::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 60%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-amber), transparent);
+  animation: transit-shimmer 2.5s linear infinite;
+}

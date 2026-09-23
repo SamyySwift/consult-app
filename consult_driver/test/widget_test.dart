@@ -1,0 +1,21 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:automove_driver/app.dart';
+import 'package:automove_driver/features/auth/providers/auth_provider.dart';
+import 'package:automove_driver/features/jobs/providers/job_provider.dart';
+
+void main() {
+  testWidgets('Driver app smoke test', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AuthProvider()),
+          ChangeNotifierProvider(create: (_) => JobProvider()),
+        ],
+        child: const AutoMoveDriverApp(),
+      ),
+    );
+    expect(find.byType(MaterialApp), findsOneWidget);
+  });
+}
