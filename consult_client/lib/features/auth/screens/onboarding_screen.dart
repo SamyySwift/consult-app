@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/widgets/slide_action_button.dart';
 
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
@@ -79,50 +80,36 @@ class OnboardingScreen extends StatelessWidget {
                     ),
                   ).animate(delay: 200.ms).fadeIn(duration: 600.ms).slideY(begin: 0.2),
                   SizedBox(height: 48),
-                  GestureDetector(
-                    onTap: () => context.go(AppConstants.routeRegister),
-                    child: Container(
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: context.colors.accent,
-                        borderRadius: BorderRadius.circular(32),
-                      ),
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.arrow_forward_rounded,
-                              color: context.colors.accent,
-                              size: 24,
-                            ),
-                          ),
-                          Expanded(
-                            child: Center(
-                              child: Text(
-                                'Get Started',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Icon(Icons.chevron_right_rounded, color: Colors.white70, size: 20),
-                          Icon(Icons.chevron_right_rounded, color: Colors.white54, size: 20),
-                          Icon(Icons.chevron_right_rounded, color: Colors.white38, size: 20),
-                          SizedBox(width: 8),
-                        ],
-                      ),
-                    ),
+                  SlideActionButton(
+                    label: 'Get Started',
+                    onSlideComplete: () => context.go(AppConstants.routeRegister),
                   ).animate(delay: 400.ms).fadeIn(duration: 600.ms).slideY(begin: 0.2),
+                  SizedBox(height: 20),
+                  Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Already have an account? ',
+                          style: TextStyle(
+                            color: context.colors.textSecondary,
+                            fontSize: 14,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => context.go(AppConstants.routeLogin),
+                          child: Text(
+                            'Sign in',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ).animate(delay: 500.ms).fadeIn(duration: 600.ms),
                 ],
               ),
             ),
