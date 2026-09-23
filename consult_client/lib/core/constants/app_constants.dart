@@ -1,3 +1,5 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class AppConstants {
   AppConstants._();
 
@@ -23,8 +25,8 @@ class AppConstants {
 
   // Supabase Configuration
   static const String supabaseUrl = 'https://ulksjcitenlxtvxwvktw.supabase.co';
-  static const String supabaseAnonKey =
-      const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+  static String get supabaseAnonKey =>
+      dotenv.env['SUPABASE_ANON_KEY'] ?? '';
 
   // Paystack
   // TODO: Replace with your live Paystack public key

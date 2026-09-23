@@ -1,3 +1,5 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class AppRoutes {
   // Auth
   static const String splash = '/';
@@ -20,8 +22,8 @@ class AppConstants {
 
   // Supabase Configuration
   static const String supabaseUrl = 'https://ulksjcitenlxtvxwvktw.supabase.co';
-  static const String supabaseAnonKey =
-      const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+  static String get supabaseAnonKey =>
+      dotenv.env['SUPABASE_ANON_KEY'] ?? '';
 
   // Storage Keys
   static const String keyUserData = 'driver_user_data';
