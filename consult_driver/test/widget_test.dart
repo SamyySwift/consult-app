@@ -7,15 +7,18 @@ import 'package:automove_driver/features/jobs/providers/job_provider.dart';
 
 void main() {
   testWidgets('Driver app smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(create: (_) => AuthProvider()),
-          ChangeNotifierProvider(create: (_) => JobProvider()),
-        ],
-        child: const CarpitalConsultDriverApp(),
-      ),
-    );
-    expect(find.byType(MaterialApp), findsOneWidget);
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => AuthProvider()),
+            ChangeNotifierProvider(create: (_) => JobProvider()),
+          ],
+          child: const CarpitalConsultDriverApp(),
+        ),
+      );
+      expect(find.byType(MaterialApp), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    });
   });
 }

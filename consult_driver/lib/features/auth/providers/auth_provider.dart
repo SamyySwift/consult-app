@@ -121,11 +121,15 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   bool _isAuthenticated = false;
+  String? _pendingEmail;
+  bool _needsOtp = false;
 
   DriverModel? get driver => _driver;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _isAuthenticated;
+  String? get pendingEmail => _pendingEmail;
+  bool get needsOtp => _needsOtp;
 
   AuthProvider() {
     _initSession();
@@ -176,6 +180,16 @@ class AuthProvider extends ChangeNotifier {
         'password': password,
       });
 
+      if (res.data != null && (res.data as Map<String, dynamic>)['requiresOtp'] == true) {
+        _pendingEmail = email.trim();
+        _needsOtp = true;
+        _errorMessage = (res.data as Map<String, dynamic>)['error'] ??
+            'Verification required. Code sent to your email.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
       if (res.isSuccess && res.data != null) {
         final data = res.data as Map<String, dynamic>;
         final token = data['token'] as String?;
@@ -201,6 +215,8 @@ class AuthProvider extends ChangeNotifier {
           }
         }
 
+        _pendingEmail = null;
+        _needsOtp = false;
         _isAuthenticated = true;
         _isLoading = false;
         notifyListeners();
@@ -246,6 +262,15 @@ class AuthProvider extends ChangeNotifier {
 
       if (res.isSuccess && res.data != null) {
         final data = res.data as Map<String, dynamic>;
+
+        if (data['requiresOtp'] == true) {
+          _pendingEmail = email.trim();
+          _needsOtp = true;
+          _isLoading = false;
+          notifyListeners();
+          return true;
+        }
+
         final token = data['token'] as String?;
         await ApiClient.instance.setToken(token);
 
@@ -280,14 +305,89 @@ class AuthProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> verifyOtp(String otp) async {
+  Future<bool> verifyOtp(String otp, {String? email}) async {
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
-    await Future.delayed(const Duration(milliseconds: 600));
-    final success = otp.length == 6;
+
+    final targetEmail = (email ?? _pendingEmail ?? _driver?.email ?? '').trim();
+    if (targetEmail.isEmpty) {
+      _errorMessage = 'No email associated with this verification attempt';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      final res = await ApiClient.instance.post('/api/driver/verify-otp', {
+        'email': targetEmail,
+        'otp': otp.trim(),
+      });
+
+      if (res.isSuccess && res.data != null) {
+        final data = res.data as Map<String, dynamic>;
+        final token = data['token'] as String?;
+        await ApiClient.instance.setToken(token);
+
+        if (data['driver'] != null) {
+          _driver = DriverModel.fromJson(data['driver'] as Map<String, dynamic>);
+        }
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('driver_logged_in', true);
+        if (_driver != null) {
+          await prefs.setString('driver_id', _driver!.id);
+          await prefs.setString('driver_email', _driver!.email);
+          await prefs.setString('driver_first_name', _driver!.firstName);
+          await prefs.setString('driver_last_name', _driver!.lastName);
+          await prefs.setString('driver_phone', _driver!.phone);
+          if (_driver!.licenseNumber != null) {
+            await prefs.setString('driver_license', _driver!.licenseNumber!);
+          }
+          if (_driver!.vehiclePlate != null) {
+            await prefs.setString('driver_plate', _driver!.vehiclePlate!);
+          }
+        }
+
+        _pendingEmail = null;
+        _needsOtp = false;
+        _isAuthenticated = true;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = res.errorMessage ?? 'Invalid verification code';
+      }
+    } catch (e) {
+      debugPrint('Driver OTP verify error: $e');
+      _errorMessage = e.toString();
+    }
+
     _isLoading = false;
     notifyListeners();
-    return success;
+    return false;
+  }
+
+  Future<bool> resendOtp(String email) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final res = await ApiClient.instance.post('/api/driver/resend-otp', {
+        'email': email.trim(),
+      });
+
+      _isLoading = false;
+      notifyListeners();
+      return res.isSuccess;
+    } catch (e) {
+      debugPrint('Driver resend OTP error: $e');
+      _errorMessage = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> logout() async {

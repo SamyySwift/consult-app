@@ -49,7 +49,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!mounted) return;
 
     if (success) {
-      context.go(AppRoutes.dashboard);
+      if (auth.needsOtp) {
+        final email = _emailController.text.trim();
+        context.go('${AppRoutes.otp}?email=${Uri.encodeComponent(email)}');
+      } else {
+        context.go(AppRoutes.dashboard);
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

@@ -43,6 +43,11 @@ class _LoginScreenState extends State<LoginScreen> {
     if (success) {
       context.go(AppRoutes.dashboard);
     } else {
+      if (auth.needsOtp) {
+        final email = _emailController.text.trim();
+        context.go('${AppRoutes.otp}?email=${Uri.encodeComponent(email)}');
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: const Color(0xFF1E1E1E),

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
+import { sendOtpEmail } from '../services/email';
 
 export const driverRouter = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'carpital_consult_super_secret_jwt_key_2026';
@@ -15,6 +16,10 @@ function extractDriverId(req: Request): string | null {
     } catch (_) {}
   }
   return (req.body.driverId || req.query.driverId) as string | null;
+}
+
+function generate6DigitOtp(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 // -------------------------------------------------------------
@@ -45,6 +50,24 @@ driverRouter.post('/login', async (req: Request, res: Response): Promise<void> =
     const isMatch = await bcrypt.compare(password, driver.password_hash);
     if (!isMatch) {
       res.status(401).json({ error: 'Invalid driver credentials' });
+      return;
+    }
+
+    if (!driver.is_verified) {
+      const otp = generate6DigitOtp();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      await pool.query('DELETE FROM public.email_verifications WHERE email = $1', [cleanEmail]);
+      await pool.query(
+        'INSERT INTO public.email_verifications (email, otp_code, expires_at) VALUES ($1, $2, $3)',
+        [cleanEmail, otp, expiresAt]
+      );
+      await sendOtpEmail(cleanEmail, otp);
+
+      res.status(403).json({
+        error: 'Account not verified. A verification code has been sent to your email.',
+        requiresOtp: true,
+        email: cleanEmail,
+      });
       return;
     }
 
@@ -79,7 +102,7 @@ driverRouter.post('/login', async (req: Request, res: Response): Promise<void> =
 });
 
 // -------------------------------------------------------------
-// POST /api/driver/register - Driver Registration
+// POST /api/driver/register - Driver Registration (Sends OTP)
 // -------------------------------------------------------------
 driverRouter.post('/register', async (req: Request, res: Response): Promise<void> => {
   const { firstName, lastName, email, phone, password, licenseNumber, vehicleType, vehiclePlate } = req.body;
@@ -92,8 +115,8 @@ driverRouter.post('/register', async (req: Request, res: Response): Promise<void
   const cleanEmail = email.trim().toLowerCase();
 
   try {
-    const existing = await pool.query('SELECT id FROM public.users WHERE email = $1', [cleanEmail]);
-    if (existing.rows.length > 0) {
+    const existing = await pool.query('SELECT id, is_verified FROM public.users WHERE email = $1', [cleanEmail]);
+    if (existing.rows.length > 0 && existing.rows[0].is_verified) {
       res.status(409).json({ error: 'An account with this email already exists' });
       return;
     }
@@ -101,23 +124,115 @@ driverRouter.post('/register', async (req: Request, res: Response): Promise<void
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    const result = await pool.query(
-      `INSERT INTO public.users (
-        first_name, last_name, email, phone, password_hash, role, is_verified,
-        license_number, vehicle_type, vehicle_plate, is_online
-      ) VALUES ($1, $2, $3, $4, $5, 'driver', TRUE, $6, $7, $8, TRUE)
-      RETURNING *`,
-      [firstName, lastName || '', cleanEmail, phone || '', passwordHash, licenseNumber || '', vehicleType || 'Tow Truck', vehiclePlate || '']
+    let driverId: string;
+    if (existing.rows.length > 0) {
+      const updated = await pool.query(
+        `UPDATE public.users SET
+          first_name = $1, last_name = $2, phone = $3, password_hash = $4,
+          role = 'driver', license_number = $5, vehicle_type = $6, vehicle_plate = $7,
+          updated_at = NOW()
+        WHERE email = $8 RETURNING id`,
+        [firstName, lastName || '', phone || '', passwordHash, licenseNumber || '', vehicleType || 'Tow Truck', vehiclePlate || '', cleanEmail]
+      );
+      driverId = updated.rows[0].id;
+    } else {
+      const result = await pool.query(
+        `INSERT INTO public.users (
+          first_name, last_name, email, phone, password_hash, role, is_verified,
+          license_number, vehicle_type, vehicle_plate, is_online
+        ) VALUES ($1, $2, $3, $4, $5, 'driver', FALSE, $6, $7, $8, TRUE)
+        RETURNING id`,
+        [firstName, lastName || '', cleanEmail, phone || '', passwordHash, licenseNumber || '', vehicleType || 'Tow Truck', vehiclePlate || '']
+      );
+      driverId = result.rows[0].id;
+    }
+
+    // Generate 6-digit OTP
+    const otp = generate6DigitOtp();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Invalidate old OTPs for this email
+    await pool.query('DELETE FROM public.email_verifications WHERE email = $1', [cleanEmail]);
+
+    // Store new OTP
+    await pool.query(
+      'INSERT INTO public.email_verifications (email, otp_code, expires_at) VALUES ($1, $2, $3)',
+      [cleanEmail, otp, expiresAt]
     );
 
-    const driver = result.rows[0];
+    // Send via Resend
+    await sendOtpEmail(cleanEmail, otp);
+
+    res.status(201).json({
+      success: true,
+      requiresOtp: true,
+      message: 'Verification code sent to your email',
+      email: cleanEmail,
+      driverId,
+    });
+  } catch (err: any) {
+    console.error('Driver register error:', err);
+    res.status(500).json({ error: 'Server error during driver registration' });
+  }
+});
+
+// -------------------------------------------------------------
+// POST /api/driver/verify-otp - Verify Driver OTP
+// -------------------------------------------------------------
+driverRouter.post('/verify-otp', async (req: Request, res: Response): Promise<void> => {
+  const { email, otp } = req.body;
+  if (!email || !otp) {
+    res.status(400).json({ error: 'Email and OTP code are required' });
+    return;
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanOtp = otp.toString().trim();
+
+  try {
+    const result = await pool.query(
+      `SELECT id, expires_at, verified 
+       FROM public.email_verifications 
+       WHERE email = $1 AND otp_code = $2 
+       ORDER BY created_at DESC LIMIT 1`,
+      [cleanEmail, cleanOtp]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(400).json({ error: 'Invalid verification code' });
+      return;
+    }
+
+    const verification = result.rows[0];
+    if (new Date(verification.expires_at) < new Date()) {
+      res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
+      return;
+    }
+
+    // Mark verified
+    await pool.query('UPDATE public.email_verifications SET verified = TRUE WHERE id = $1', [verification.id]);
+
+    const userUpdate = await pool.query(
+      `UPDATE public.users 
+       SET is_verified = TRUE, updated_at = NOW() 
+       WHERE email = $1 
+       RETURNING *`,
+      [cleanEmail]
+    );
+
+    if (userUpdate.rows.length === 0) {
+      res.status(404).json({ error: 'Driver not found' });
+      return;
+    }
+
+    const driver = userUpdate.rows[0];
     const token = jwt.sign(
       { id: driver.id, email: driver.email, role: 'driver' },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
 
-    res.status(201).json({
+    res.json({
       success: true,
       token,
       driver: {
@@ -131,13 +246,58 @@ driverRouter.post('/register', async (req: Request, res: Response): Promise<void
         vehiclePlate: driver.vehicle_plate,
         isOnline: driver.is_online,
         isVerified: true,
-        rating: 5.0,
-        totalJobs: 0,
+        rating: parseFloat(driver.rating || '5.0'),
+        totalJobs: driver.total_trips || 0,
       },
     });
   } catch (err: any) {
-    console.error('Driver register error:', err);
-    res.status(500).json({ error: 'Server error during driver registration' });
+    console.error('Driver OTP verify error:', err);
+    res.status(500).json({ error: 'Server error verifying OTP' });
+  }
+});
+
+// -------------------------------------------------------------
+// POST /api/driver/resend-otp - Resend Driver OTP
+// -------------------------------------------------------------
+driverRouter.post('/resend-otp', async (req: Request, res: Response): Promise<void> => {
+  const { email } = req.body;
+  if (!email) {
+    res.status(400).json({ error: 'Email is required' });
+    return;
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  try {
+    const user = await pool.query('SELECT id, is_verified FROM public.users WHERE email = $1', [cleanEmail]);
+    if (user.rows.length === 0) {
+      res.status(404).json({ error: 'No driver account found with this email' });
+      return;
+    }
+
+    if (user.rows[0].is_verified) {
+      res.status(400).json({ error: 'This driver account is already verified. Please sign in.' });
+      return;
+    }
+
+    const otp = generate6DigitOtp();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await pool.query('DELETE FROM public.email_verifications WHERE email = $1', [cleanEmail]);
+    await pool.query(
+      'INSERT INTO public.email_verifications (email, otp_code, expires_at) VALUES ($1, $2, $3)',
+      [cleanEmail, otp, expiresAt]
+    );
+
+    await sendOtpEmail(cleanEmail, otp);
+
+    res.json({
+      success: true,
+      message: 'New verification code sent to your email',
+    });
+  } catch (err: any) {
+    console.error('Driver resend OTP error:', err);
+    res.status(500).json({ error: 'Failed to resend code' });
   }
 });
 
