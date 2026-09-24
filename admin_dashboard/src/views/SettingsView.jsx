@@ -13,6 +13,12 @@ function formatAmount(value) {
   return parseInt(raw, 10).toLocaleString('en-US');
 }
 
+// NUMERIC columns come back from Postgres as strings like "75000.00".
+// Round to a whole number first so the decimals aren't read as extra digits.
+function formatDbAmount(value) {
+  return formatAmount(Math.round(Number(value) || 0));
+}
+
 function parseAmount(value) {
   if (!value) return 0;
   return parseInt(String(value).replace(/\D/g, ''), 10) || 0;
@@ -44,8 +50,8 @@ export function SettingsView() {
       
       const formatted = (data || []).map(p => ({
         ...p,
-        base_price_str: formatAmount(p.base_price),
-        enclosed_addon_str: formatAmount(p.enclosed_addon),
+        base_price_str: formatDbAmount(p.base_price),
+        enclosed_addon_str: formatDbAmount(p.enclosed_addon),
       }));
       setPricingData(formatted);
     } catch (err) {
@@ -82,7 +88,7 @@ export function SettingsView() {
       setTimeout(() => setMessage(null), 3000);
     } catch (err) {
       console.error('Error saving pricing:', err);
-      setMessage({ type: 'error', text: 'Failed to save changes.' });
+      setMessage({ type: 'error', text: `Failed to save changes: ${err.message}` });
     } finally {
       setSaving(false);
     }

@@ -57,6 +57,7 @@ class _Step4InsuranceState extends State<Step4Insurance> {
     final currencyFormatter = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 0);
     final formattedInsuranceFee = currencyFormatter.format(calculatedInsurance > 0 ? calculatedInsurance : (vehicleValue * (pctRate / 100)));
     final formattedVehicleValue = currencyFormatter.format(vehicleValue);
+    final pctLabel = NumberFormat('0.##').format(pctRate); // 20 -> "20", 1.5 -> "1.5"
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(24),
@@ -77,11 +78,11 @@ class _Step4InsuranceState extends State<Step4Insurance> {
             child: _InsuranceCard(
               isSelected: _hasInsurance,
               title: 'Add Insurance Coverage',
-              subtitle: 'Covered at $pctRate% of your vehicle\'s declared worth ($formattedVehicleValue).',
+              subtitle: 'Covered at $pctLabel% of your vehicle\'s declared worth ($formattedVehicleValue).',
               price: formattedInsuranceFee,
               features: [
                 'Full replacement value coverage based on $formattedVehicleValue vehicle worth',
-                'Rate: $pctRate% of declared vehicle value',
+                'Rate: $pctLabel% of declared vehicle value',
                 'Damage from accidents & collisions',
                 'Theft & vandalism protection',
                 'Weather and natural disaster cover',
@@ -151,7 +152,7 @@ class _Step4InsuranceState extends State<Step4Insurance> {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Great choice! Your vehicle ($formattedVehicleValue worth) is protected for $formattedInsuranceFee ($pctRate%) added to your booking total.',
+                      'Great choice! Your vehicle ($formattedVehicleValue worth) is protected for $formattedInsuranceFee ($pctLabel%) added to your booking total.',
                       style: TextStyle(fontSize: 12, color: context.colors.success, fontWeight: FontWeight.w500),
                     ),
                   ),
@@ -215,7 +216,11 @@ class _InsuranceCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      // Wrap lets the badge drop to its own line on narrow screens
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
                             title,
@@ -225,8 +230,7 @@ class _InsuranceCard extends StatelessWidget {
                               color: context.colors.textPrimary,
                             ),
                           ),
-                          if (isRecommended) ...[
-                            SizedBox(width: 8),
+                          if (isRecommended)
                             Container(
                               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
@@ -238,27 +242,32 @@ class _InsuranceCard extends StatelessWidget {
                                 style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white),
                               ),
                             ),
-                          ],
                         ],
                       ),
                       SizedBox(height: 4),
                       Text(subtitle, style: TextStyle(fontSize: 12, color: context.colors.textSecondary)),
+                      SizedBox(height: 10),
+                      // Price sits on its own line: it scales with vehicle worth and can be long
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              price,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: isSelected ? context.colors.accent : context.colors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 6),
+                          Text('one-time', style: TextStyle(fontSize: 11, color: context.colors.textLight)),
+                        ],
+                      ),
                     ],
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      price,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: isSelected ? context.colors.accent : context.colors.textPrimary,
-                      ),
-                    ),
-                    Text('one-time', style: TextStyle(fontSize: 10, color: context.colors.textLight)),
-                  ],
                 ),
               ],
             ),
@@ -278,10 +287,13 @@ class _InsuranceCard extends StatelessWidget {
               children: features.map((f) => Padding(
                 padding: EdgeInsets.only(bottom: 6),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(Icons.check_rounded, color: context.colors.success, size: 16),
                     SizedBox(width: 8),
-                    Text(f, style: TextStyle(fontSize: 12, color: context.colors.textSecondary)),
+                    Expanded(
+                      child: Text(f, style: TextStyle(fontSize: 12, color: context.colors.textSecondary)),
+                    ),
                   ],
                 ),
               )).toList(),
