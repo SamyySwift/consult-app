@@ -70,6 +70,12 @@
 	<string>This app needs access to location when open to broadcast your location to the client during active transit.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>This app needs access to location when in the background to broadcast your location to the client during active transit.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app shares your location with the client while you are delivering their vehicle, including when the app is in the background, so they can track the delivery.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to take photos of the vehicle condition at pickup.</string>
 	<key>NSMicrophoneUsageDescription</key>

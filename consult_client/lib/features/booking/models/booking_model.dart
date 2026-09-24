@@ -101,6 +101,29 @@ class BookingModel {
     this.driverLng,
   });
 
+  BookingModel copyWithDriverLocation(double lat, double lng) => BookingModel(
+        id: id,
+        userId: userId,
+        vehicle: vehicle,
+        pickup: pickup,
+        dropoff: dropoff,
+        serviceType: serviceType,
+        transportMode: transportMode,
+        hasInsurance: hasInsurance,
+        documentPaths: documentPaths,
+        basePrice: basePrice,
+        insuranceFee: insuranceFee,
+        totalAmount: totalAmount,
+        status: status,
+        createdAt: createdAt,
+        driverName: driverName,
+        driverPhone: driverPhone,
+        paymentReference: paymentReference,
+        clientSignatureUrl: clientSignatureUrl,
+        driverLat: lat,
+        driverLng: lng,
+      );
+
   String get serviceName {
     switch (serviceType) {
       case ServiceType.standard:

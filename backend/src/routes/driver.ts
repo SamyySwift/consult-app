@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { pool } from '../db';
 import { sendOtpEmail } from '../services/email';
 import { uploadBufferOrBase64 } from './upload';
+import { broadcastDriverLocation } from '../realtime';
 
 export const driverRouter = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'carpital_consult_super_secret_jwt_key_2026';
@@ -628,6 +629,7 @@ driverRouter.post('/location', async (req: Request, res: Response): Promise<void
         `UPDATE public.bookings SET driver_lat = $1, driver_lng = $2, updated_at = NOW() WHERE id = $3`,
         [lat, lng, jobId]
       );
+      broadcastDriverLocation(jobId, Number(lat), Number(lng));
     }
 
     res.json({ success: true });

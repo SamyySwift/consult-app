@@ -18,7 +18,8 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.4.0",
     "pg": "^8.13.1",
-    "resend": "^4.1.2"
+    "resend": "^4.1.2",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -28,6 +29,7 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.11.10",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }

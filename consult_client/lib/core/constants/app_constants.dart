@@ -27,6 +27,11 @@ class AppConstants {
   static String get apiBaseUrl =>
       dotenv.env['API_BASE_URL'] ?? 'https://carpitalconsult.com';
 
+  /// WebSocket origin for live tracking, derived from [apiBaseUrl] so the two
+  /// can never drift apart across environments.
+  static String get wsBaseUrl =>
+      apiBaseUrl.replaceFirst(RegExp(r'^http'), 'ws');
+
   // Supabase Configuration
   static const String supabaseUrl = 'https://ulksjcitenlxtvxwvktw.supabase.co';
   static String get supabaseAnonKey =>

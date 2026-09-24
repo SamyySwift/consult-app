@@ -1,7 +1,9 @@
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { initDatabase, pool } from './db';
+import { attachRealtime } from './realtime';
 import { authRouter } from './routes/auth';
 import { bookingsRouter } from './routes/bookings';
 import { driverRouter } from './routes/driver';
@@ -52,7 +54,10 @@ async function startServer() {
       console.warn('⚠️ No DATABASE_URL set. Running in deferred DB mode.');
     }
 
-    app.listen(PORT, () => {
+    const server = http.createServer(app);
+    attachRealtime(server);
+
+    server.listen(PORT, () => {
       console.log(`🚀 Carpital Consult API server running on port ${PORT}`);
     });
   } catch (err) {

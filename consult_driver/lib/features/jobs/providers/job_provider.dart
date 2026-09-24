@@ -253,6 +253,42 @@ class JobProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Keeps GPS alive once the driver leaves the app: a foreground service on
+  /// Android, background location updates on iOS.
+  ///
+  /// No timeLimit on any platform — it makes the stream throw a TimeoutException
+  /// whenever a fix takes longer than the window (tunnels, underground car
+  /// parks), which would kill location updates for the rest of the job.
+  LocationSettings _buildLocationSettings() {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 25,
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'Delivery in progress',
+          notificationText: 'Sharing your location with the client.',
+          enableWakeLock: true,
+        ),
+      );
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return AppleSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 25,
+        allowBackgroundLocationUpdates: true,
+        showBackgroundLocationIndicator: true,
+        pauseLocationUpdatesAutomatically: false,
+        activityType: ActivityType.automotiveNavigation,
+      );
+    }
+
+    return const LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 25,
+    );
+  }
+
   Future<void> _startLocationTracking(String jobId) async {
     if (_positionStream != null) return;
 
@@ -276,18 +312,16 @@ class JobProvider extends ChangeNotifier {
       return;
     }
 
-    const LocationSettings locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 50,
-      timeLimit: Duration(seconds: 10),
-    );
-
-    _positionStream = Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+    _positionStream = Geolocator.getPositionStream(
+      locationSettings: _buildLocationSettings(),
+    ).listen(
       (Position? position) {
         if (position != null) {
           _updateDriverLocation(jobId, position.latitude, position.longitude);
         }
       },
+      onError: (Object e) => debugPrint('Location stream error: $e'),
+      cancelOnError: false,
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/booking_model.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/tracking_socket.dart';
 
 class BookingProvider extends ChangeNotifier {
   // The wizard draft being built
@@ -40,16 +41,35 @@ class BookingProvider extends ChangeNotifier {
 
   static const String defaultDemoClientId = 'b0000000-0000-0000-0000-000000000001';
 
+  StreamSubscription<DriverLocationUpdate>? _locationSub;
+
   BookingProvider() {
     fetchBookings();
     _startPolling();
+    _startRealtimeTracking();
   }
 
+  /// Driver positions arrive over the socket, so this only needs to catch
+  /// non-location changes (status, driver assignment) and cover reconnect gaps.
   void _startPolling() {
     _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       fetchBookings(silent: true);
     });
+  }
+
+  void _startRealtimeTracking() {
+    _locationSub = TrackingSocket.instance.updates.listen(_applyDriverLocation);
+    TrackingSocket.instance.connect();
+  }
+
+  void _applyDriverLocation(DriverLocationUpdate update) {
+    final index = _bookings.indexWhere((b) => b.id == update.bookingId);
+    if (index == -1) return;
+
+    _bookings[index] =
+        _bookings[index].copyWithDriverLocation(update.lat, update.lng);
+    notifyListeners();
   }
 
   /// Fetch bookings from Railway API
@@ -69,6 +89,9 @@ class BookingProvider extends ChangeNotifier {
         _bookings = data
             .map((json) => BookingModel.fromSupabaseMap(json as Map<String, dynamic>))
             .toList();
+
+        TrackingSocket.instance
+            .subscribeTo(activeBookings.map((b) => b.id));
       }
     } catch (e) {
       debugPrint('Error fetching bookings from API: $e');
@@ -263,6 +286,7 @@ class BookingProvider extends ChangeNotifier {
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    _locationSub?.cancel();
     super.dispose();
   }
 }
