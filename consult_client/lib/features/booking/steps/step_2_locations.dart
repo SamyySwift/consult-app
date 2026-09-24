@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/booking_provider.dart';
+import '../widgets/address_search_field.dart';
+import '../../../../core/services/geocoding_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/custom_button.dart';
-import '../../../../core/widgets/custom_text_field.dart';
-import '../../../../core/utils/validators.dart';
 
 class Step2Locations extends StatefulWidget {
   final VoidCallback onNext;
@@ -21,6 +23,8 @@ class _Step2LocationsState extends State<Step2Locations> {
   final _dropoffCtrl = TextEditingController();
   DateTime? _pickupDate;
   TimeOfDay? _pickupTime;
+  PlaceResult? _pickup;
+  PlaceResult? _dropoff;
 
   @override
   void initState() {
@@ -28,6 +32,12 @@ class _Step2LocationsState extends State<Step2Locations> {
     final draft = context.read<BookingProvider>().draft;
     _pickupCtrl.text = draft.pickupAddress ?? '';
     _dropoffCtrl.text = draft.dropoffAddress ?? '';
+    if (draft.pickupAddress != null && draft.pickupLat != null && draft.pickupLng != null) {
+      _pickup = PlaceResult(name: draft.pickupAddress!, lat: draft.pickupLat!, lng: draft.pickupLng!);
+    }
+    if (draft.dropoffAddress != null && draft.dropoffLat != null && draft.dropoffLng != null) {
+      _dropoff = PlaceResult(name: draft.dropoffAddress!, lat: draft.dropoffLat!, lng: draft.dropoffLng!);
+    }
     if (draft.pickupDateTime != null) {
       _pickupDate = draft.pickupDateTime;
       _pickupTime = TimeOfDay.fromDateTime(draft.pickupDateTime!);
@@ -91,7 +101,7 @@ class _Step2LocationsState extends State<Step2Locations> {
   }
 
   void _submit() {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || _pickup == null || _dropoff == null) return;
     if (_pickupDate == null || _pickupTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please select a pickup date and time')),
@@ -110,14 +120,14 @@ class _Step2LocationsState extends State<Step2Locations> {
     context.read<BookingProvider>()
       ..updatePickup(
         address: _pickupCtrl.text.trim(),
-        lat: 6.5244,
-        lng: 3.3792,
+        lat: _pickup!.lat,
+        lng: _pickup!.lng,
         dateTime: pickupDateTime,
       )
       ..updateDropoff(
         address: _dropoffCtrl.text.trim(),
-        lat: 9.0820,
-        lng: 8.6753,
+        lat: _dropoff!.lat,
+        lng: _dropoff!.lng,
       );
 
     widget.onNext();
@@ -140,72 +150,32 @@ class _Step2LocationsState extends State<Step2Locations> {
 
             SizedBox(height: 28),
 
-            // Route visual
-            Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: context.colors.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: context.colors.border),
-              ),
-              child: Column(
-                children: [
-                  // Pickup
-                  Row(
-                    children: [
-                      Column(
-                        children: [
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: context.colors.success,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(Icons.radio_button_checked, color: Colors.white, size: 16),
-                          ),
-                          Container(width: 2, height: 40, color: context.colors.border),
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: context.colors.error,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(Icons.location_on, color: Colors.white, size: 16),
-                          ),
-                        ],
-                      ),
-                      SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            CustomTextField(
-                              label: 'Pickup Address *',
-                              hint: 'Enter full pickup address',
-                              controller: _pickupCtrl,
-                              validator: (v) => AppValidators.validateRequired(v, field: 'Pickup address'),
-                              prefixIcon: null,
-                              maxLines: 2,
-                            ),
-                            SizedBox(height: 12),
-                            CustomTextField(
-                              label: 'Delivery Address *',
-                              hint: 'Enter full delivery address',
-                              controller: _dropoffCtrl,
-                              validator: (v) => AppValidators.validateRequired(v, field: 'Delivery address'),
-                              prefixIcon: null,
-                              maxLines: 2,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            AddressSearchField(
+              label: 'Pickup Address *',
+              hint: 'Start typing, e.g. Admiralty Way, Lekki',
+              mapTitle: 'Pickup Location',
+              fieldName: 'Pickup address',
+              controller: _pickupCtrl,
+              selected: _pickup,
+              onSelected: (p) => setState(() => _pickup = p),
             ),
+
+            SizedBox(height: 8),
+
+            AddressSearchField(
+              label: 'Delivery Address *',
+              hint: 'Start typing the delivery address',
+              mapTitle: 'Delivery Location',
+              fieldName: 'Delivery address',
+              controller: _dropoffCtrl,
+              selected: _dropoff,
+              onSelected: (p) => setState(() => _dropoff = p),
+            ),
+
+            if (_pickup != null || _dropoff != null) ...[
+              SizedBox(height: 12),
+              _RoutePreviewMap(pickup: _pickup, dropoff: _dropoff),
+            ],
 
             SizedBox(height: 24),
 
@@ -276,6 +246,75 @@ class _Step2LocationsState extends State<Step2Locations> {
       ),
     );
   }
+}
+
+/// Static preview of the chosen points so the client can see they're right.
+class _RoutePreviewMap extends StatelessWidget {
+  final PlaceResult? pickup;
+  final PlaceResult? dropoff;
+
+  const _RoutePreviewMap({this.pickup, this.dropoff});
+
+  @override
+  Widget build(BuildContext context) {
+    final points = [
+      if (pickup != null) LatLng(pickup!.lat, pickup!.lng),
+      if (dropoff != null) LatLng(dropoff!.lat, dropoff!.lng),
+    ];
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        height: 180,
+        child: FlutterMap(
+          // Rebuild when a point changes so the camera re-fits
+          key: ValueKey(points.map((p) => '${p.latitude},${p.longitude}').join('|')),
+          options: MapOptions(
+            initialCenter: points.first,
+            initialZoom: 15,
+            initialCameraFit: points.length > 1
+                ? CameraFit.coordinates(coordinates: points, padding: EdgeInsets.all(36))
+                : null,
+            interactionOptions: InteractionOptions(flags: InteractiveFlag.none),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.carpitalconsult.app',
+            ),
+            if (points.length > 1)
+              PolylineLayer(
+                polylines: [
+                  Polyline(points: points, color: context.colors.accent, strokeWidth: 3),
+                ],
+              ),
+            MarkerLayer(
+              markers: [
+                if (pickup != null)
+                  _pin(context, LatLng(pickup!.lat, pickup!.lng), context.colors.success, Icons.radio_button_checked),
+                if (dropoff != null)
+                  _pin(context, LatLng(dropoff!.lat, dropoff!.lng), context.colors.error, Icons.location_on),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Marker _pin(BuildContext context, LatLng point, Color color, IconData icon) => Marker(
+        point: point,
+        width: 28,
+        height: 28,
+        child: Container(
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          child: Icon(icon, color: Colors.white, size: 14),
+        ),
+      );
 }
 
 class _DateTimeChip extends StatelessWidget {

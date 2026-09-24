@@ -1,38 +1,60 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:timeline_tile/timeline_tile.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../booking/providers/booking_provider.dart';
 import '../../booking/models/booking_model.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/status_badge.dart';
 
 class TrackingScreen extends StatefulWidget {
-  const TrackingScreen({super.key});
+  /// Booking to show first, e.g. from a booking card's Track button.
+  final String? bookingId;
+
+  const TrackingScreen({super.key, this.bookingId});
 
   @override
   State<TrackingScreen> createState() => _TrackingScreenState();
 }
 
 class _TrackingScreenState extends State<TrackingScreen> {
-  BookingModel? _selectedBooking;
+  // Store the id, not the model: live location updates replace the booking
+  // object, and a held reference would keep showing the old position.
+  String? _selectedId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedId = widget.bookingId;
+  }
+
+  @override
+  void didUpdateWidget(covariant TrackingScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.bookingId != null && widget.bookingId != oldWidget.bookingId) {
+      _selectedId = widget.bookingId;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<BookingProvider>(
       builder: (context, prov, _) {
         final active = prov.activeBookings;
-        _selectedBooking ??= active.isNotEmpty ? active.first : null;
+        final selected = active.where((b) => b.id == _selectedId).firstOrNull ??
+            (active.isNotEmpty ? active.first : null);
 
         return Scaffold(
           backgroundColor: context.colors.background,
-          body: _selectedBooking == null
+          body: selected == null
               ? _EmptyTracking()
               : _TrackingContent(
-                  booking: _selectedBooking!,
+                  booking: selected,
                   activeBookings: active,
-                  onSelectBooking: (b) => setState(() => _selectedBooking = b),
+                  onSelectBooking: (b) => setState(() => _selectedId = b.id),
                 ),
         );
       },
@@ -66,6 +88,20 @@ class _TrackingContentState extends State<_TrackingContent> {
     final oldLng = oldWidget.booking.driverLng;
     final newLat = widget.booking.driverLat;
     final newLng = widget.booking.driverLng;
+
+    if (oldWidget.booking.id != widget.booking.id) {
+      // Switched to another booking: jump to its driver, or its route midpoint
+      final b = widget.booking;
+      if (newLat != null && newLng != null) {
+        _mapController.move(LatLng(newLat, newLng), 14.0);
+      } else {
+        _mapController.move(
+          LatLng((b.pickup.lat + b.dropoff.lat) / 2, (b.pickup.lng + b.dropoff.lng) / 2),
+          6.0,
+        );
+      }
+      return;
+    }
 
     if (newLat != null && newLng != null) {
       if (oldLat != newLat || oldLng != newLng) {
@@ -250,6 +286,14 @@ class _TrackingContentState extends State<_TrackingContent> {
           ),
         ),
 
+        // ── Distance, ETA and position freshness ───────────────────
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: _LiveProgressCard(booking: booking),
+          ),
+        ),
+
         // ── Booking info card ─────────────────────────────────────
         SliverToBoxAdapter(
           child: Container(
@@ -261,21 +305,25 @@ class _TrackingContentState extends State<_TrackingContent> {
             ),
             child: Row(
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '#${booking.id}',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      booking.vehicle.displayName,
-                      style: TextStyle(fontSize: 13, color: context.colors.textLight),
-                    ),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '#${booking.id}',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        booking.vehicle.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13, color: context.colors.textLight),
+                      ),
+                    ],
+                  ),
                 ),
-                Spacer(),
+                SizedBox(width: 8),
                 StatusBadge(status: booking.status),
               ],
             ),
@@ -325,7 +373,7 @@ class _TrackingContentState extends State<_TrackingContent> {
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
-                        onPressed: () {},
+                        onPressed: () => _callDriver(context, booking.driverPhone!),
                         icon: Icon(Icons.phone_rounded, size: 18, color: context.colors.accent),
                         padding: EdgeInsets.zero,
                       ),
@@ -355,6 +403,166 @@ class _TrackingContentState extends State<_TrackingContent> {
 
         SliverToBoxAdapter(child: SizedBox(height: 32)),
       ],
+    );
+  }
+}
+
+Future<void> _callDriver(BuildContext context, String phone) async {
+  final uri = Uri(scheme: 'tel', path: phone.replaceAll(RegExp(r'[^0-9+]'), ''));
+  final launched = await launchUrl(uri);
+  if (!launched && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Could not start a call to $phone')),
+    );
+  }
+}
+
+/// Distance left, a rough arrival estimate, and how recent the driver's
+/// position is. Rebuilds on a timer so "updated X ago" stays current.
+class _LiveProgressCard extends StatefulWidget {
+  final BookingModel booking;
+  const _LiveProgressCard({required this.booking});
+
+  @override
+  State<_LiveProgressCard> createState() => _LiveProgressCardState();
+}
+
+class _LiveProgressCardState extends State<_LiveProgressCard> {
+  // Straight-line distance understates road distance; this is a typical detour factor.
+  static const _roadFactor = 1.3;
+  // Average truck speed including traffic and stops, for a rough estimate only.
+  static const _avgSpeedKmh = 45.0;
+  static const _staleAfter = Duration(minutes: 2);
+
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  String _formatAgo(Duration d) {
+    if (d.inSeconds < 60) return '${d.inSeconds.clamp(1, 59)}s ago';
+    if (d.inMinutes < 60) return '${d.inMinutes} min ago';
+    if (d.inHours < 24) return '${d.inHours} h ago';
+    return '${d.inDays} d ago';
+  }
+
+  String _formatEta(double hours) {
+    final minutes = (hours * 60).round();
+    if (minutes < 60) return '${minutes.clamp(1, 59)} min';
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    return m == 0 ? '$h h' : '$h h $m min';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final booking = widget.booking;
+    final lat = booking.driverLat;
+    final lng = booking.driverLng;
+
+    if (lat == null || lng == null) {
+      return _card(
+        context,
+        icon: Icons.gps_not_fixed_rounded,
+        iconColor: context.colors.textLight,
+        title: 'Waiting for the driver\'s location',
+        subtitle: 'The map will update live once your driver starts moving.',
+      );
+    }
+
+    // Before pickup the driver is heading to the pickup point
+    final headingToPickup = booking.status == BookingStatusEnum.pending ||
+        booking.status == BookingStatusEnum.confirmed;
+    final target = headingToPickup ? booking.pickup : booking.dropoff;
+    final km = const Distance().as(LengthUnit.Meter, LatLng(lat, lng), LatLng(target.lat, target.lng)) / 1000;
+    final roadKm = km * _roadFactor;
+
+    final String title;
+    final String subtitle;
+    if (km < 0.3) {
+      title = headingToPickup ? 'Driver is at the pickup point' : 'Driver is at the delivery address';
+      subtitle = 'Arriving now';
+    } else {
+      final distance = roadKm < 10 ? roadKm.toStringAsFixed(1) : roadKm.round().toString();
+      title = 'About $distance km ${headingToPickup ? 'to pickup' : 'to delivery'}';
+      subtitle = 'Estimated arrival in ${_formatEta(roadKm / _avgSpeedKmh)}';
+    }
+
+    final at = booking.driverLocationAt;
+    final age = at != null ? DateTime.now().difference(at) : null;
+    final isStale = age != null && age > _staleAfter;
+
+    return _card(
+      context,
+      icon: Icons.route_rounded,
+      iconColor: context.colors.accent,
+      title: title,
+      subtitle: subtitle,
+      footer: age == null
+          ? null
+          : Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: isStale ? context.colors.warning : context.colors.success,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                SizedBox(width: 6),
+                Text(
+                  isStale ? 'Last seen ${_formatAgo(age)}' : 'Live · updated ${_formatAgo(age)}',
+                  style: TextStyle(fontSize: 11, color: context.colors.textLight),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _card(
+    BuildContext context, {
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    Widget? footer,
+  }) {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: iconColor, size: 22),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: context.colors.textPrimary)),
+                SizedBox(height: 2),
+                Text(subtitle, style: TextStyle(fontSize: 12, color: context.colors.textSecondary)),
+                if (footer != null) ...[SizedBox(height: 8), footer],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

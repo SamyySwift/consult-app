@@ -218,7 +218,7 @@ class HomeScreen extends StatelessWidget {
                       padding: EdgeInsets.fromLTRB(24, 0, 24, 10),
                       child: _ActiveBookingCard(
                         booking: active[i],
-                        onTrack: () => context.go(AppConstants.routeTrack),
+                        onTrack: () => context.go('${AppConstants.routeTrack}?booking=${active[i].id}'),
                       ),
                     ).animate(delay: Duration(milliseconds: 300 + i * 100)).fadeIn(duration: 400.ms).slideY(begin: 0.08),
                     childCount: active.length,

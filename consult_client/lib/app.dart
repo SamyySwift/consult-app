@@ -87,7 +87,9 @@ final _router = GoRouter(
         ),
         GoRoute(
           path: AppConstants.routeTrack,
-          builder: (context, state) => const TrackingScreen(),
+          builder: (context, state) => TrackingScreen(
+            bookingId: state.uri.queryParameters['booking'],
+          ),
         ),
         GoRoute(
           path: AppConstants.routePayments,

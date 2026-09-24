@@ -109,6 +109,9 @@ export async function initDatabase() {
       ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS transport_mode TEXT DEFAULT 'standard';
       ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS driver_lat DOUBLE PRECISION;
       ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS driver_lng DOUBLE PRECISION;
+      ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS driver_location_at TIMESTAMPTZ;
+      -- Last status the client was emailed about, so repeated updates don't re-send
+      ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS last_notified_status TEXT;
       ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS document_paths JSONB DEFAULT '[]'::jsonb;
       ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS has_insurance BOOLEAN DEFAULT FALSE;
       ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS base_price NUMERIC(12, 2) DEFAULT 0;

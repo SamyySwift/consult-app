@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
+import { notifyBookingStatus } from '../services/bookingNotifications';
 import { sendOtpEmail } from '../services/email';
 import { uploadBufferOrBase64 } from './upload';
 import { broadcastDriverLocation } from '../realtime';
@@ -597,6 +598,8 @@ driverRouter.post('/jobs/:id/status', async (req: Request, res: Response): Promi
       );
     }
 
+    void notifyBookingStatus(result.rows[0].id, result.rows[0].status);
+
     res.json({ success: true, job: result.rows[0] });
   } catch (err: any) {
     console.error('Error updating job status:', err);
@@ -626,7 +629,7 @@ driverRouter.post('/location', async (req: Request, res: Response): Promise<void
 
     if (jobId) {
       await pool.query(
-        `UPDATE public.bookings SET driver_lat = $1, driver_lng = $2, updated_at = NOW() WHERE id = $3`,
+        `UPDATE public.bookings SET driver_lat = $1, driver_lng = $2, driver_location_at = NOW(), updated_at = NOW() WHERE id = $3`,
         [lat, lng, jobId]
       );
       broadcastDriverLocation(jobId, Number(lat), Number(lng));

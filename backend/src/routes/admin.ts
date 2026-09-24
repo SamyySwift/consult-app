@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db';
+import { notifyBookingStatus } from '../services/bookingNotifications';
 import { getInsurancePercentage, setInsurancePercentage } from '../settings';
 
 export const adminRouter = Router();
@@ -123,6 +124,8 @@ adminRouter.post('/assign-driver', async (req: Request, res: Response): Promise<
       return;
     }
 
+    void notifyBookingStatus(result.rows[0].id, result.rows[0].status);
+
     res.json({ success: true, booking: result.rows[0] });
   } catch (err: any) {
     console.error('Error assigning driver:', err);
@@ -160,6 +163,8 @@ adminRouter.post('/bookings/:id/status', async (req: Request, res: Response): Pr
       res.status(404).json({ error: 'Booking not found' });
       return;
     }
+
+    void notifyBookingStatus(result.rows[0].id, result.rows[0].status);
 
     res.json({ success: true, booking: result.rows[0] });
   } catch (err: any) {

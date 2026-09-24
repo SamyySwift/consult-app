@@ -9,11 +9,13 @@ class DriverLocationUpdate {
   final String bookingId;
   final double lat;
   final double lng;
+  final DateTime at;
 
   const DriverLocationUpdate({
     required this.bookingId,
     required this.lat,
     required this.lng,
+    required this.at,
   });
 }
 
@@ -114,7 +116,12 @@ class TrackingSocket {
         final bookingId = msg['bookingId'] as String?;
         if (lat != null && lng != null && bookingId != null) {
           _updates.add(
-            DriverLocationUpdate(bookingId: bookingId, lat: lat, lng: lng),
+            DriverLocationUpdate(
+              bookingId: bookingId,
+              lat: lat,
+              lng: lng,
+              at: DateTime.tryParse(msg['at'] as String? ?? '') ?? DateTime.now(),
+            ),
           );
         }
         break;

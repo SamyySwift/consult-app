@@ -303,7 +303,7 @@ class _BookingTile extends StatelessWidget {
               ),
               if (booking.status == BookingStatusEnum.inTransit)
                 GestureDetector(
-                  onTap: () => context.go(AppConstants.routeTrack),
+                  onTap: () => context.go('${AppConstants.routeTrack}?booking=${booking.id}'),
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(

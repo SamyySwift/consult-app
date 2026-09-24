@@ -77,6 +77,8 @@ class BookingModel {
   final String? clientSignatureUrl;
   final double? driverLat;
   final double? driverLng;
+  /// When the driver's position was last reported.
+  final DateTime? driverLocationAt;
 
   const BookingModel({
     required this.id,
@@ -99,9 +101,10 @@ class BookingModel {
     this.clientSignatureUrl,
     this.driverLat,
     this.driverLng,
+    this.driverLocationAt,
   });
 
-  BookingModel copyWithDriverLocation(double lat, double lng) => BookingModel(
+  BookingModel copyWithDriverLocation(double lat, double lng, DateTime at) => BookingModel(
         id: id,
         userId: userId,
         vehicle: vehicle,
@@ -122,6 +125,7 @@ class BookingModel {
         clientSignatureUrl: clientSignatureUrl,
         driverLat: lat,
         driverLng: lng,
+        driverLocationAt: at,
       );
 
   String get serviceName {
@@ -138,6 +142,17 @@ class BookingModel {
   /// Safely parses a value that may be a String or num into a double.
   /// This handles PostgreSQL NUMERIC columns which the pg Node.js driver
   /// returns as strings.
+  /// The API sends the driver's name as separate first/last columns.
+  static String? _driverName(Map<String, dynamic> json) {
+    final full = json['driver_name'] as String?;
+    if (full != null && full.trim().isNotEmpty) return full.trim();
+    final name = [json['driver_first_name'], json['driver_last_name']]
+        .whereType<String>()
+        .where((s) => s.trim().isNotEmpty)
+        .join(' ');
+    return name.isEmpty ? null : name;
+  }
+
   static double _parseDouble(dynamic value, double fallback) {
     if (value == null) return fallback;
     if (value is num) return value.toDouble();
@@ -245,12 +260,15 @@ class BookingModel {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String) ?? DateTime.now()
           : DateTime.now(),
-      driverName: json['driver_name'] as String?,
+      driverName: _driverName(json),
       driverPhone: json['driver_phone'] as String?,
       paymentReference: json['payment_reference'] as String?,
       clientSignatureUrl: json['client_signature_url'] as String?,
       driverLat: json['driver_lat'] != null ? _parseDouble(json['driver_lat'], 0) : null,
       driverLng: json['driver_lng'] != null ? _parseDouble(json['driver_lng'], 0) : null,
+      driverLocationAt: json['driver_location_at'] != null
+          ? DateTime.tryParse(json['driver_location_at'].toString())
+          : null,
     );
   }
 
