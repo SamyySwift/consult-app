@@ -49,6 +49,15 @@ export async function initDatabase() {
       ALTER TABLE public.users ADD COLUMN IF NOT EXISTS total_trips INT DEFAULT 0;
       ALTER TABLE public.users ADD COLUMN IF NOT EXISTS current_lat DOUBLE PRECISION;
       ALTER TABLE public.users ADD COLUMN IF NOT EXISTS current_lng DOUBLE PRECISION;
+      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_profile_completed BOOLEAN DEFAULT FALSE;
+      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS date_of_birth TEXT;
+      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS residential_address TEXT;
+      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS state_lga TEXT;
+      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS emergency_contact_name TEXT;
+      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS emergency_contact_phone TEXT;
+      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS emergency_contact_relationship TEXT;
+      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS nin_number TEXT;
+      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS driver_license_image TEXT;
 
       -- Email Verifications (OTP) Table
       CREATE TABLE IF NOT EXISTS public.email_verifications (

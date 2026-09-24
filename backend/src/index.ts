@@ -6,6 +6,8 @@ import { authRouter } from './routes/auth';
 import { bookingsRouter } from './routes/bookings';
 import { driverRouter } from './routes/driver';
 import { adminRouter } from './routes/admin';
+import { uploadRouter } from './routes/upload';
+import { filesRouter } from './routes/files';
 
 dotenv.config();
 
@@ -39,6 +41,8 @@ app.use('/api/auth', authRouter);
 app.use('/api/bookings', bookingsRouter);
 app.use('/api/driver', driverRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/upload', uploadRouter);
+app.use('/api/files', filesRouter);
 
 async function startServer() {
   try {

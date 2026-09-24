@@ -8,6 +8,7 @@ import 'features/auth/screens/onboarding_screen.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen.dart';
 import 'features/auth/screens/otp_screen.dart';
+import 'features/auth/screens/complete_profile_screen.dart';
 import 'features/shell/main_shell.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/jobs/screens/job_board_screen.dart';
@@ -39,6 +40,10 @@ final _router = GoRouter(
       builder: (context, state) => DriverOtpScreen(
         email: state.uri.queryParameters['email'],
       ),
+    ),
+    GoRoute(
+      path: AppRoutes.completeProfile,
+      builder: (context, state) => const CompleteProfileScreen(),
     ),
     GoRoute(
       path: AppRoutes.activeJob,

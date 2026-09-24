@@ -80,7 +80,11 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
     if (!mounted) return;
 
     if (success) {
-      context.go(AppRoutes.dashboard);
+      if (auth.driver?.isProfileCompleted == true) {
+        context.go(AppRoutes.dashboard);
+      } else {
+        context.go(AppRoutes.completeProfile);
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

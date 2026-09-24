@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
 import { sendOtpEmail } from '../services/email';
+import { uploadBufferOrBase64 } from './upload';
 
 export const driverRouter = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'carpital_consult_super_secret_jwt_key_2026';
@@ -20,6 +21,34 @@ function extractDriverId(req: Request): string | null {
 
 function generate6DigitOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function formatDriverResponse(driver: any) {
+  return {
+    id: driver.id,
+    firstName: driver.first_name,
+    lastName: driver.last_name,
+    fullName: `${driver.first_name || ''} ${driver.last_name || ''}`.trim(),
+    email: driver.email,
+    phone: driver.phone || '',
+    avatarUrl: driver.avatar_url || null,
+    dateOfBirth: driver.date_of_birth || null,
+    residentialAddress: driver.residential_address || null,
+    stateLga: driver.state_lga || null,
+    emergencyContactName: driver.emergency_contact_name || null,
+    emergencyContactPhone: driver.emergency_contact_phone || null,
+    emergencyContactRelationship: driver.emergency_contact_relationship || null,
+    ninNumber: driver.nin_number || null,
+    driverLicenseImage: driver.driver_license_image || null,
+    licenseNumber: driver.license_number || null,
+    vehicleType: driver.vehicle_type || 'Tow Truck',
+    vehiclePlate: driver.vehicle_plate || null,
+    isOnline: driver.is_online || false,
+    isVerified: driver.is_verified || false,
+    isProfileCompleted: driver.is_profile_completed || false,
+    rating: parseFloat(driver.rating || '5.0'),
+    totalJobs: driver.total_trips || 0,
+  };
 }
 
 // -------------------------------------------------------------
@@ -80,20 +109,7 @@ driverRouter.post('/login', async (req: Request, res: Response): Promise<void> =
     res.json({
       success: true,
       token,
-      driver: {
-        id: driver.id,
-        firstName: driver.first_name,
-        lastName: driver.last_name,
-        email: driver.email,
-        phone: driver.phone,
-        licenseNumber: driver.license_number,
-        vehicleType: driver.vehicle_type,
-        vehiclePlate: driver.vehicle_plate,
-        isOnline: driver.is_online,
-        isVerified: driver.is_verified,
-        rating: parseFloat(driver.rating || '5.0'),
-        totalJobs: driver.total_trips || 0,
-      },
+      driver: formatDriverResponse(driver),
     });
   } catch (err: any) {
     console.error('Driver login error:', err);
@@ -235,20 +251,7 @@ driverRouter.post('/verify-otp', async (req: Request, res: Response): Promise<vo
     res.json({
       success: true,
       token,
-      driver: {
-        id: driver.id,
-        firstName: driver.first_name,
-        lastName: driver.last_name,
-        email: driver.email,
-        phone: driver.phone,
-        licenseNumber: driver.license_number,
-        vehicleType: driver.vehicle_type,
-        vehiclePlate: driver.vehicle_plate,
-        isOnline: driver.is_online,
-        isVerified: true,
-        rating: parseFloat(driver.rating || '5.0'),
-        totalJobs: driver.total_trips || 0,
-      },
+      driver: formatDriverResponse(driver),
     });
   } catch (err: any) {
     console.error('Driver OTP verify error:', err);
@@ -298,6 +301,143 @@ driverRouter.post('/resend-otp', async (req: Request, res: Response): Promise<vo
   } catch (err: any) {
     console.error('Driver resend OTP error:', err);
     res.status(500).json({ error: 'Failed to resend code' });
+  }
+});
+
+// -------------------------------------------------------------
+// GET /api/driver/profile - Fetch Current Driver Profile
+// -------------------------------------------------------------
+driverRouter.get('/profile', async (req: Request, res: Response): Promise<void> => {
+  const driverId = extractDriverId(req) || (req.query.driverId as string);
+
+  if (!driverId) {
+    res.status(401).json({ error: 'Unauthorized. Driver ID required.' });
+    return;
+  }
+
+  try {
+    const result = await pool.query('SELECT * FROM public.users WHERE id = $1', [driverId]);
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Driver not found' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      driver: formatDriverResponse(result.rows[0]),
+    });
+  } catch (err: any) {
+    console.error('Fetch driver profile error:', err);
+    res.status(500).json({ error: 'Failed to fetch driver profile' });
+  }
+});
+
+// -------------------------------------------------------------
+// POST /api/driver/complete-profile - Complete KYC Profile
+// -------------------------------------------------------------
+driverRouter.post('/complete-profile', async (req: Request, res: Response): Promise<void> => {
+  const driverId = extractDriverId(req) || req.body.driverId;
+  const {
+    fullName,
+    firstName,
+    lastName,
+    avatarUrl,
+    dateOfBirth,
+    phone,
+    email,
+    residentialAddress,
+    stateLga,
+    emergencyContactName,
+    emergencyContactPhone,
+    emergencyContactRelationship,
+    ninNumber,
+    driverLicenseImage,
+    licenseNumber,
+  } = req.body;
+
+  if (!driverId && !email) {
+    res.status(400).json({ error: 'Driver identification required' });
+    return;
+  }
+
+  // Parse name if full name provided
+  let fName = firstName;
+  let lName = lastName;
+  if (fullName && (!fName || !lName)) {
+    const parts = fullName.trim().split(' ');
+    fName = parts[0] || '';
+    lName = parts.slice(1).join(' ') || '';
+  }
+
+  try {
+    let finalAvatarUrl = avatarUrl;
+    if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.startsWith('data:image')) {
+      try {
+        finalAvatarUrl = await uploadBufferOrBase64(
+          avatarUrl,
+          'avatars',
+          `driver_${driverId || 'avatar'}`
+        );
+      } catch (uploadErr) {
+        console.error('Failed to upload avatar to bucket:', uploadErr);
+      }
+    }
+
+    let finalLicenseImage = driverLicenseImage;
+    if (driverLicenseImage && typeof driverLicenseImage === 'string' && driverLicenseImage.startsWith('data:image')) {
+      try {
+        finalLicenseImage = await uploadBufferOrBase64(
+          driverLicenseImage,
+          'licenses',
+          `license_${driverId || 'doc'}`
+        );
+      } catch (uploadErr) {
+        console.error('Failed to upload license image to bucket:', uploadErr);
+      }
+    }
+
+    const updates: string[] = ['is_profile_completed = TRUE', 'updated_at = NOW()'];
+    const values: any[] = [];
+    let pIdx = 1;
+
+    if (fName) { updates.push(`first_name = $${pIdx++}`); values.push(fName); }
+    if (lName !== undefined) { updates.push(`last_name = $${pIdx++}`); values.push(lName); }
+    if (phone) { updates.push(`phone = $${pIdx++}`); values.push(phone); }
+    if (finalAvatarUrl) { updates.push(`avatar_url = $${pIdx++}`); values.push(finalAvatarUrl); }
+    if (dateOfBirth) { updates.push(`date_of_birth = $${pIdx++}`); values.push(dateOfBirth); }
+    if (residentialAddress) { updates.push(`residential_address = $${pIdx++}`); values.push(residentialAddress); }
+    if (stateLga) { updates.push(`state_lga = $${pIdx++}`); values.push(stateLga); }
+    if (emergencyContactName) { updates.push(`emergency_contact_name = $${pIdx++}`); values.push(emergencyContactName); }
+    if (emergencyContactPhone) { updates.push(`emergency_contact_phone = $${pIdx++}`); values.push(emergencyContactPhone); }
+    if (emergencyContactRelationship) { updates.push(`emergency_contact_relationship = $${pIdx++}`); values.push(emergencyContactRelationship); }
+    if (ninNumber) { updates.push(`nin_number = $${pIdx++}`); values.push(ninNumber); }
+    if (finalLicenseImage) { updates.push(`driver_license_image = $${pIdx++}`); values.push(finalLicenseImage); }
+    if (licenseNumber) { updates.push(`license_number = $${pIdx++}`); values.push(licenseNumber); }
+
+    let query: string;
+    if (driverId) {
+      values.push(driverId);
+      query = `UPDATE public.users SET ${updates.join(', ')} WHERE id = $${pIdx} RETURNING *`;
+    } else {
+      values.push(email.trim().toLowerCase());
+      query = `UPDATE public.users SET ${updates.join(', ')} WHERE email = $${pIdx} RETURNING *`;
+    }
+
+    const result = await pool.query(query, values);
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Driver account not found' });
+      return;
+    }
+
+    const driver = result.rows[0];
+    res.json({
+      success: true,
+      message: 'Profile completed successfully',
+      driver: formatDriverResponse(driver),
+    });
+  } catch (err: any) {
+    console.error('Complete profile error:', err);
+    res.status(500).json({ error: 'Failed to complete profile: ' + err.message });
   }
 });
 

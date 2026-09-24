@@ -41,7 +41,11 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     
     if (success) {
-      context.go(AppRoutes.dashboard);
+      if (auth.driver?.isProfileCompleted == true) {
+        context.go(AppRoutes.dashboard);
+      } else {
+        context.go(AppRoutes.completeProfile);
+      }
     } else {
       if (auth.needsOtp) {
         final email = _emailController.text.trim();

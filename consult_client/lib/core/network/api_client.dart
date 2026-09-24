@@ -125,6 +125,57 @@ class ApiClient {
     }
   }
 
+  Future<ApiResponse> uploadFile({
+    required List<int> bytes,
+    required String fileName,
+    String folder = 'uploads',
+  }) async {
+    final url = Uri.parse('$baseUrl/api/upload');
+    try {
+      final request = http.MultipartRequest('POST', url);
+      if (_token != null && _token!.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $_token';
+      }
+      request.fields['folder'] = folder;
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: fileName,
+        ),
+      );
+
+      final streamedResponse = await request.send();
+      final res = await http.Response.fromStream(streamedResponse);
+      final decoded = _tryDecodeJson(res.body);
+
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        return ApiResponse(
+          isSuccess: true,
+          statusCode: res.statusCode,
+          data: decoded,
+        );
+      } else {
+        final errorMsg = decoded is Map
+            ? (decoded['error'] ?? decoded['message'] ?? 'Upload failed')
+            : 'Upload failed (${res.statusCode})';
+        return ApiResponse(
+          isSuccess: false,
+          statusCode: res.statusCode,
+          errorMessage: errorMsg.toString(),
+          data: decoded,
+        );
+      }
+    } catch (e) {
+      debugPrint('API upload error: $e');
+      return const ApiResponse(
+        isSuccess: false,
+        statusCode: 0,
+        errorMessage: 'Network error during file upload.',
+      );
+    }
+  }
+
   dynamic _tryDecodeJson(String source) {
     try {
       return jsonDecode(source);

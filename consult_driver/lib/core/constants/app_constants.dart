@@ -7,6 +7,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String register = '/register';
   static const String otp = '/otp';
+  static const String completeProfile = '/complete-profile';
 
   // Main shell
   static const String dashboard = '/dashboard';

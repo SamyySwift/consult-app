@@ -10,11 +10,21 @@ class DriverModel {
   final String lastName;
   final String email;
   final String phone;
+  final String? avatarUrl;
+  final String? dateOfBirth;
+  final String? residentialAddress;
+  final String? stateLga;
+  final String? emergencyContactName;
+  final String? emergencyContactPhone;
+  final String? emergencyContactRelationship;
+  final String? ninNumber;
+  final String? driverLicenseImage;
   final String? licenseNumber;
   final String? vehicleType;
   final String? vehiclePlate;
   final bool isOnline;
   final bool isVerified;
+  final bool isProfileCompleted;
   final double rating;
   final int totalJobs;
 
@@ -24,11 +34,21 @@ class DriverModel {
     required this.lastName,
     required this.email,
     required this.phone,
+    this.avatarUrl,
+    this.dateOfBirth,
+    this.residentialAddress,
+    this.stateLga,
+    this.emergencyContactName,
+    this.emergencyContactPhone,
+    this.emergencyContactRelationship,
+    this.ninNumber,
+    this.driverLicenseImage,
     this.licenseNumber,
     this.vehicleType,
     this.vehiclePlate,
     this.isOnline = false,
     this.isVerified = false,
+    this.isProfileCompleted = false,
     this.rating = 5.0,
     this.totalJobs = 0,
   });
@@ -45,11 +65,23 @@ class DriverModel {
       lastName: json['lastName'] ?? json['last_name'] ?? '',
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',
+      avatarUrl: json['avatarUrl'] ?? json['avatar_url'],
+      dateOfBirth: json['dateOfBirth'] ?? json['date_of_birth'],
+      residentialAddress: json['residentialAddress'] ?? json['residential_address'],
+      stateLga: json['stateLga'] ?? json['state_lga'],
+      emergencyContactName: json['emergencyContactName'] ?? json['emergency_contact_name'],
+      emergencyContactPhone: json['emergencyContactPhone'] ?? json['emergency_contact_phone'],
+      emergencyContactRelationship:
+          json['emergencyContactRelationship'] ?? json['emergency_contact_relationship'],
+      ninNumber: json['ninNumber'] ?? json['nin_number'],
+      driverLicenseImage: json['driverLicenseImage'] ?? json['driver_license_image'],
       licenseNumber: json['licenseNumber'] ?? json['license_number'],
       vehicleType: json['vehicleType'] ?? json['vehicle_type'],
       vehiclePlate: json['vehiclePlate'] ?? json['vehicle_plate'],
       isOnline: json['isOnline'] == true || json['is_online'] == true,
       isVerified: json['isVerified'] == true || json['is_verified'] == true,
+      isProfileCompleted:
+          json['isProfileCompleted'] == true || json['is_profile_completed'] == true,
       rating: ((json['rating'] ?? 5.0) as num).toDouble(),
       totalJobs: json['totalJobs'] ?? json['total_trips'] ?? 0,
     );
@@ -77,11 +109,21 @@ class DriverModel {
       lastName: lastName,
       email: profileMap['email'] ?? '',
       phone: profileMap['phone'] ?? '',
+      avatarUrl: profileMap['avatar_url'],
+      dateOfBirth: profileMap['date_of_birth'],
+      residentialAddress: profileMap['residential_address'],
+      stateLga: profileMap['state_lga'],
+      emergencyContactName: profileMap['emergency_contact_name'],
+      emergencyContactPhone: profileMap['emergency_contact_phone'],
+      emergencyContactRelationship: profileMap['emergency_contact_relationship'],
+      ninNumber: profileMap['nin_number'],
+      driverLicenseImage: profileMap['driver_license_image'],
       licenseNumber: driverMap?['license_number'],
       vehicleType: driverMap?['vehicle_type'],
       vehiclePlate: driverMap?['vehicle_plate'],
       isOnline: isOnline,
       isVerified: true,
+      isProfileCompleted: profileMap['is_profile_completed'] == true,
       rating: ((driverMap?['rating'] ?? 5.0) as num).toDouble(),
       totalJobs: driverMap?['total_trips'] ?? 0,
     );
@@ -90,9 +132,19 @@ class DriverModel {
   DriverModel copyWith({
     bool? isOnline,
     bool? isVerified,
+    bool? isProfileCompleted,
     String? firstName,
     String? lastName,
     String? phone,
+    String? avatarUrl,
+    String? dateOfBirth,
+    String? residentialAddress,
+    String? stateLga,
+    String? emergencyContactName,
+    String? emergencyContactPhone,
+    String? emergencyContactRelationship,
+    String? ninNumber,
+    String? driverLicenseImage,
     String? licenseNumber,
     String? vehicleType,
     String? vehiclePlate,
@@ -105,11 +157,22 @@ class DriverModel {
       lastName: lastName ?? this.lastName,
       email: email,
       phone: phone ?? this.phone,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      residentialAddress: residentialAddress ?? this.residentialAddress,
+      stateLga: stateLga ?? this.stateLga,
+      emergencyContactName: emergencyContactName ?? this.emergencyContactName,
+      emergencyContactPhone: emergencyContactPhone ?? this.emergencyContactPhone,
+      emergencyContactRelationship:
+          emergencyContactRelationship ?? this.emergencyContactRelationship,
+      ninNumber: ninNumber ?? this.ninNumber,
+      driverLicenseImage: driverLicenseImage ?? this.driverLicenseImage,
       licenseNumber: licenseNumber ?? this.licenseNumber,
       vehicleType: vehicleType ?? this.vehicleType,
       vehiclePlate: vehiclePlate ?? this.vehiclePlate,
       isOnline: isOnline ?? this.isOnline,
       isVerified: isVerified ?? this.isVerified,
+      isProfileCompleted: isProfileCompleted ?? this.isProfileCompleted,
       rating: rating ?? this.rating,
       totalJobs: totalJobs ?? this.totalJobs,
     );
@@ -152,10 +215,20 @@ class AuthProvider extends ChangeNotifier {
           lastName: prefs.getString('driver_last_name') ?? 'Okonkwo',
           email: prefs.getString('driver_email') ?? 'driver@carpitalconsult.com',
           phone: prefs.getString('driver_phone') ?? '+234 812 345 6789',
+          avatarUrl: prefs.getString('driver_avatar_url'),
+          dateOfBirth: prefs.getString('driver_dob'),
+          residentialAddress: prefs.getString('driver_residential_address'),
+          stateLga: prefs.getString('driver_state_lga'),
+          emergencyContactName: prefs.getString('driver_emergency_name'),
+          emergencyContactPhone: prefs.getString('driver_emergency_phone'),
+          emergencyContactRelationship: prefs.getString('driver_emergency_relationship'),
+          ninNumber: prefs.getString('driver_nin'),
+          driverLicenseImage: prefs.getString('driver_license_image'),
           licenseNumber: prefs.getString('driver_license') ?? 'LG-2023-0048291',
           vehiclePlate: prefs.getString('driver_plate') ?? 'LND-394-FY',
           isVerified: true,
           isOnline: true,
+          isProfileCompleted: prefs.getBool('driver_profile_completed') ?? false,
           rating: 4.9,
           totalJobs: 52,
         );
@@ -166,6 +239,42 @@ class AuthProvider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _persistDriver(DriverModel driver) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('driver_logged_in', true);
+    await prefs.setString('driver_id', driver.id);
+    await prefs.setString('driver_email', driver.email);
+    await prefs.setString('driver_first_name', driver.firstName);
+    await prefs.setString('driver_last_name', driver.lastName);
+    await prefs.setString('driver_phone', driver.phone);
+    await prefs.setBool('driver_profile_completed', driver.isProfileCompleted);
+    if (driver.avatarUrl != null) await prefs.setString('driver_avatar_url', driver.avatarUrl!);
+    if (driver.dateOfBirth != null) await prefs.setString('driver_dob', driver.dateOfBirth!);
+    if (driver.residentialAddress != null) {
+      await prefs.setString('driver_residential_address', driver.residentialAddress!);
+    }
+    if (driver.stateLga != null) await prefs.setString('driver_state_lga', driver.stateLga!);
+    if (driver.emergencyContactName != null) {
+      await prefs.setString('driver_emergency_name', driver.emergencyContactName!);
+    }
+    if (driver.emergencyContactPhone != null) {
+      await prefs.setString('driver_emergency_phone', driver.emergencyContactPhone!);
+    }
+    if (driver.emergencyContactRelationship != null) {
+      await prefs.setString('driver_emergency_relationship', driver.emergencyContactRelationship!);
+    }
+    if (driver.ninNumber != null) await prefs.setString('driver_nin', driver.ninNumber!);
+    if (driver.driverLicenseImage != null) {
+      await prefs.setString('driver_license_image', driver.driverLicenseImage!);
+    }
+    if (driver.licenseNumber != null) {
+      await prefs.setString('driver_license', driver.licenseNumber!);
+    }
+    if (driver.vehiclePlate != null) {
+      await prefs.setString('driver_plate', driver.vehiclePlate!);
     }
   }
 
@@ -197,22 +306,7 @@ class AuthProvider extends ChangeNotifier {
 
         if (data['driver'] != null) {
           _driver = DriverModel.fromJson(data['driver'] as Map<String, dynamic>);
-        }
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('driver_logged_in', true);
-        if (_driver != null) {
-          await prefs.setString('driver_id', _driver!.id);
-          await prefs.setString('driver_email', _driver!.email);
-          await prefs.setString('driver_first_name', _driver!.firstName);
-          await prefs.setString('driver_last_name', _driver!.lastName);
-          await prefs.setString('driver_phone', _driver!.phone);
-          if (_driver!.licenseNumber != null) {
-            await prefs.setString('driver_license', _driver!.licenseNumber!);
-          }
-          if (_driver!.vehiclePlate != null) {
-            await prefs.setString('driver_plate', _driver!.vehiclePlate!);
-          }
+          await _persistDriver(_driver!);
         }
 
         _pendingEmail = null;
@@ -276,16 +370,7 @@ class AuthProvider extends ChangeNotifier {
 
         if (data['driver'] != null) {
           _driver = DriverModel.fromJson(data['driver'] as Map<String, dynamic>);
-        }
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('driver_logged_in', true);
-        if (_driver != null) {
-          await prefs.setString('driver_id', _driver!.id);
-          await prefs.setString('driver_email', _driver!.email);
-          await prefs.setString('driver_first_name', firstName);
-          await prefs.setString('driver_last_name', lastName);
-          await prefs.setString('driver_phone', phone);
+          await _persistDriver(_driver!);
         }
 
         _isAuthenticated = true;
@@ -331,22 +416,7 @@ class AuthProvider extends ChangeNotifier {
 
         if (data['driver'] != null) {
           _driver = DriverModel.fromJson(data['driver'] as Map<String, dynamic>);
-        }
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('driver_logged_in', true);
-        if (_driver != null) {
-          await prefs.setString('driver_id', _driver!.id);
-          await prefs.setString('driver_email', _driver!.email);
-          await prefs.setString('driver_first_name', _driver!.firstName);
-          await prefs.setString('driver_last_name', _driver!.lastName);
-          await prefs.setString('driver_phone', _driver!.phone);
-          if (_driver!.licenseNumber != null) {
-            await prefs.setString('driver_license', _driver!.licenseNumber!);
-          }
-          if (_driver!.vehiclePlate != null) {
-            await prefs.setString('driver_plate', _driver!.vehiclePlate!);
-          }
+          await _persistDriver(_driver!);
         }
 
         _pendingEmail = null;
@@ -387,6 +457,85 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return false;
+    }
+  }
+
+  /// Complete KYC Profile
+  Future<bool> completeProfile({
+    required String fullName,
+    required String dateOfBirth,
+    required String phone,
+    required String residentialAddress,
+    required String stateLga,
+    required String emergencyContactName,
+    required String emergencyContactPhone,
+    required String emergencyContactRelationship,
+    required String ninNumber,
+    String? email,
+    String? avatarUrl,
+    String? driverLicenseImage,
+    String? licenseNumber,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final res = await ApiClient.instance.post('/api/driver/complete-profile', {
+        'driverId': _driver?.id,
+        'email': (email ?? _driver?.email ?? _pendingEmail ?? '').trim(),
+        'fullName': fullName.trim(),
+        'dateOfBirth': dateOfBirth.trim(),
+        'phone': phone.trim(),
+        'residentialAddress': residentialAddress.trim(),
+        'stateLga': stateLga.trim(),
+        'emergencyContactName': emergencyContactName.trim(),
+        'emergencyContactPhone': emergencyContactPhone.trim(),
+        'emergencyContactRelationship': emergencyContactRelationship.trim(),
+        'ninNumber': ninNumber.trim(),
+        if (avatarUrl != null && avatarUrl.isNotEmpty) 'avatarUrl': avatarUrl,
+        if (driverLicenseImage != null && driverLicenseImage.isNotEmpty)
+          'driverLicenseImage': driverLicenseImage,
+        if (licenseNumber != null && licenseNumber.isNotEmpty)
+          'licenseNumber': licenseNumber.trim(),
+      });
+
+      if (res.isSuccess && res.data != null) {
+        final data = res.data as Map<String, dynamic>;
+        if (data['driver'] != null) {
+          _driver = DriverModel.fromJson(data['driver'] as Map<String, dynamic>);
+          await _persistDriver(_driver!);
+        }
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = res.errorMessage ?? 'Failed to complete profile';
+      }
+    } catch (e) {
+      debugPrint('Driver complete profile error: $e');
+      _errorMessage = e.toString();
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+
+  Future<void> fetchProfile() async {
+    if (_driver == null) return;
+    try {
+      final res = await ApiClient.instance.get('/api/driver/profile?driverId=${_driver!.id}');
+      if (res.isSuccess && res.data != null) {
+        final data = res.data as Map<String, dynamic>;
+        if (data['driver'] != null) {
+          _driver = DriverModel.fromJson(data['driver'] as Map<String, dynamic>);
+          await _persistDriver(_driver!);
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Fetch profile error: $e');
     }
   }
 

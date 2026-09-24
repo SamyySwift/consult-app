@@ -25,7 +25,11 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
     final auth = context.read<AuthProvider>();
     if (auth.isAuthenticated) {
-      context.go(AppRoutes.dashboard);
+      if (auth.driver?.isProfileCompleted == true) {
+        context.go(AppRoutes.dashboard);
+      } else {
+        context.go(AppRoutes.completeProfile);
+      }
     } else {
       context.go(AppRoutes.onboarding);
     }
