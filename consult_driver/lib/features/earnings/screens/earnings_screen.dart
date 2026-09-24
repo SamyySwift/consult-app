@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/services/driver_location_access.dart';
 import '../../../core/theme/driver_colors.dart';
 import '../../jobs/providers/job_provider.dart';
 import '../../jobs/models/job_model.dart';
@@ -239,7 +240,18 @@ class _ActiveVehicleContent extends StatelessWidget {
               final next = _nextStatus(job.status);
               if (next == null) return const SizedBox.shrink();
               return ElevatedButton.icon(
-                onPressed: prov.isLoading ? null : () => prov.updateJobStatus(job.id, next),
+                onPressed: prov.isLoading
+                    ? null
+                    : () async {
+                        if (next != JobStatus.completed && next != JobStatus.cancelled) {
+                          final ok = await DriverLocationAccess.ensure(
+                            context,
+                            reason: 'Your client tracks this delivery using your location. Turn it on to continue.',
+                          );
+                          if (!ok) return;
+                        }
+                        await prov.updateJobStatus(job.id, next);
+                      },
                 icon: Icon(_nextStatusIcon(next), size: 18),
                 label: Text('Mark as ${_nextStatusLabel(next)}'),
                 style: ElevatedButton.styleFrom(

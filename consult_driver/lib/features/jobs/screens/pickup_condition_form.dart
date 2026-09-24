@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import '../../../core/services/driver_location_access.dart';
 import '../../../core/theme/driver_colors.dart';
 import '../../../core/widgets/driver_button.dart';
 import '../providers/job_provider.dart';
@@ -155,6 +156,12 @@ class _PickupConditionFormState extends State<PickupConditionForm> {
       );
       return;
     }
+
+    final hasLocation = await DriverLocationAccess.ensure(
+      context,
+      reason: 'Your client tracks this delivery using your location. Turn it on to confirm pickup.',
+    );
+    if (!hasLocation || !mounted) return;
 
     setState(() => _isSubmitting = true);
 

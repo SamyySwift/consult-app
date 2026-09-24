@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/services/driver_location_access.dart';
 import '../../../core/theme/driver_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../jobs/providers/job_provider.dart';
@@ -442,6 +443,11 @@ class _CardAction extends StatelessWidget {
                   onPressed: prov.isLoading
                       ? null
                       : () async {
+                          final hasLocation = await DriverLocationAccess.ensure(
+                            context,
+                            reason: 'Your client tracks this delivery using your location. Turn it on to accept the job.',
+                          );
+                          if (!hasLocation || !context.mounted) return;
                           final ok = await prov.confirmJob(job.id);
                           if (ok && context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(

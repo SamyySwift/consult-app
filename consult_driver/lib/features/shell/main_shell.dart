@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/driver_colors.dart';
+import '../../../core/widgets/location_required_banner.dart';
+import '../jobs/providers/job_provider.dart';
+import 'package:provider/provider.dart';
 
 class MainShell extends StatelessWidget {
   final Widget child;
@@ -14,7 +17,21 @@ class MainShell extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: DriverColors.background,
-      body: child,
+      body: Consumer<JobProvider>(
+        builder: (context, jobs, _) => Column(
+          children: [
+            const LocationRequiredBanner(),
+            Expanded(
+              // The banner already clears the status bar when it's shown
+              child: MediaQuery.removePadding(
+                context: context,
+                removeTop: jobs.locationBlocked,
+                child: child,
+              ),
+            ),
+          ],
+        ),
+      ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Color(0xFF0D0D0D),

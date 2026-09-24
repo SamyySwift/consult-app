@@ -5,6 +5,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../core/theme/driver_colors.dart';
 import '../../../core/widgets/driver_button.dart';
+import '../../../core/widgets/location_required_banner.dart';
+import '../../../core/services/driver_location_access.dart';
 import '../../../core/constants/app_constants.dart';
 import '../providers/job_provider.dart';
 import '../models/job_model.dart';
@@ -85,21 +87,37 @@ class ActiveJobScreen extends StatelessWidget {
             ],
           ),
 
-          // Back Button
+          // Location warning + back button
           Positioned(
-            top: MediaQuery.of(context).padding.top + 10,
-            left: 16,
-            child: CircleAvatar(
-              backgroundColor: const Color(0xFF141414),
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () {
-                  if (context.canPop()) {
-                    context.pop();
-                  } else {
-                    context.go(AppRoutes.dashboard);
-                  }
-                },
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Consumer<JobProvider>(
+              builder: (context, prov, _) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const LocationRequiredBanner(),
+                  Padding(
+                    // The banner already clears the status bar when it's shown
+                    padding: EdgeInsets.only(
+                      left: 16,
+                      top: prov.locationBlocked ? 10 : MediaQuery.of(context).padding.top + 10,
+                    ),
+                    child: CircleAvatar(
+                      backgroundColor: const Color(0xFF141414),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () {
+                          if (context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go(AppRoutes.dashboard);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -256,7 +274,13 @@ class ActiveJobScreen extends StatelessWidget {
           label: 'Initiate Route Transit',
           backgroundColor: DriverColors.accent,
           foregroundColor: Colors.black,
-          onPressed: () => prov.updateJobStatus(job.id, JobStatus.inTransit),
+          onPressed: () async {
+            final ok = await DriverLocationAccess.ensure(
+              context,
+              reason: 'Your client tracks this delivery using your location. Turn it on to start the trip.',
+            );
+            if (ok) await prov.updateJobStatus(job.id, JobStatus.inTransit);
+          },
         );
       case JobStatus.inTransit:
         return DriverButton(

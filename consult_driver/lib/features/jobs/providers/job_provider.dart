@@ -1,31 +1,67 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:geolocator/geolocator.dart';
 import '../models/job_model.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/services/driver_location_access.dart';
 
-class JobProvider extends ChangeNotifier {
+class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
   List<JobModel> _allJobs = [];
   bool _isLoading = false;
   bool _hasLoadedFromApi = false;
   Timer? _pollingTimer;
   StreamSubscription<Position>? _positionStream;
+  StreamSubscription<ServiceStatus>? _serviceStatusSub;
+  bool _startingTracking = false;
+  LocationAccess? _locationAccess;
 
   List<JobModel> get allJobs => List.unmodifiable(_allJobs);
   bool get isLoading => _isLoading;
 
+  /// True when the driver has a job but the client can't see their location.
+  bool get locationBlocked =>
+      hasActiveDelivery && _locationAccess != null && _locationAccess != LocationAccess.granted;
+
   JobProvider() {
     fetchJobs();
     _startPolling();
+    WidgetsBinding.instance.addObserver(this);
+    try {
+      // Restart tracking when the driver turns location services back on
+      _serviceStatusSub = Geolocator.getServiceStatusStream().listen((_) => recheckLocation());
+    } catch (e) {
+      debugPrint('Location service status unavailable: $e');
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _serviceStatusSub?.cancel();
     _pollingTimer?.cancel();
     _stopLocationTracking();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The driver may have changed location permission in Settings
+    if (state == AppLifecycleState.resumed) recheckLocation();
+  }
+
+  /// Re-reads location access and restarts tracking for the active job.
+  Future<void> recheckLocation() async {
+    _stopLocationTracking();
+    final job = activeJob;
+    if (job != null) {
+      await _startLocationTracking(job.id);
+    } else {
+      _locationAccess = await DriverLocationAccess.check();
+      notifyListeners();
+    }
   }
 
   /// Start background polling every 5 seconds to sync live jobs
@@ -53,8 +89,8 @@ class JobProvider extends ChangeNotifier {
         _allJobs = remoteJobs;
         _hasLoadedFromApi = true;
 
-        // Check if we need to resume location tracking
-        if (hasActiveDelivery && activeJob?.status == JobStatus.inTransit) {
+        // Share location for the whole job, including the drive to pickup
+        if (hasActiveDelivery) {
           _startLocationTracking(activeJob!.id);
         } else {
           _stopLocationTracking();
@@ -120,6 +156,7 @@ class JobProvider extends ChangeNotifier {
         confirmedAt: DateTime.now(),
       );
     }
+    _startLocationTracking(jobId);
 
     _isLoading = false;
     notifyListeners();
@@ -293,39 +330,35 @@ class JobProvider extends ChangeNotifier {
   }
 
   Future<void> _startLocationTracking(String jobId) async {
-    if (_positionStream != null) return;
+    // fetchJobs runs every few seconds; don't open a second stream mid-start
+    if (_positionStream != null || _startingTracking) return;
+    _startingTracking = true;
 
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      debugPrint('Location services are disabled.');
-      return;
-    }
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        debugPrint('Location permissions are denied');
+    try {
+      final access = await DriverLocationAccess.check();
+      if (access != _locationAccess) {
+        _locationAccess = access;
+        notifyListeners();
+      }
+      if (access != LocationAccess.granted) {
+        debugPrint('Location unavailable ($access); client cannot track this job.');
         return;
       }
-    }
 
-    if (permission == LocationPermission.deniedForever) {
-      debugPrint('Location permissions are permanently denied.');
-      return;
+      _positionStream = Geolocator.getPositionStream(
+        locationSettings: _buildLocationSettings(),
+      ).listen(
+        (Position? position) {
+          if (position != null) {
+            _updateDriverLocation(jobId, position.latitude, position.longitude);
+          }
+        },
+        onError: (Object e) => debugPrint('Location stream error: $e'),
+        cancelOnError: false,
+      );
+    } finally {
+      _startingTracking = false;
     }
-
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: _buildLocationSettings(),
-    ).listen(
-      (Position? position) {
-        if (position != null) {
-          _updateDriverLocation(jobId, position.latitude, position.longitude);
-        }
-      },
-      onError: (Object e) => debugPrint('Location stream error: $e'),
-      cancelOnError: false,
-    );
   }
 
   Future<void> _updateDriverLocation(String jobId, double lat, double lng) async {

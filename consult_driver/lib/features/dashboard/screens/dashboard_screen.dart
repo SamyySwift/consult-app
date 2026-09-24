@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/services/driver_location_access.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/driver_colors.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -112,7 +113,17 @@ class DashboardScreen extends StatelessWidget {
 
                         // Online / Status Switch
                         InkWell(
-                          onTap: () => auth.toggleOnlineStatus(),
+                          onTap: () async {
+                            final goingOnline = !(driver?.isOnline ?? false);
+                            if (goingOnline) {
+                              final ok = await DriverLocationAccess.ensure(
+                                context,
+                                reason: 'Clients track their vehicle using your location. Turn it on to go online.',
+                              );
+                              if (!ok) return;
+                            }
+                            auth.toggleOnlineStatus();
+                          },
                           borderRadius: BorderRadius.circular(20),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -605,6 +616,11 @@ class _TeslaPendingJobCard extends StatelessWidget {
             onPressed: jobProv.isLoading
                 ? null
                 : () async {
+                    final ok = await DriverLocationAccess.ensure(
+                      context,
+                      reason: 'Your client tracks this delivery using your location. Turn it on to accept the job.',
+                    );
+                    if (!ok || !context.mounted) return;
                     await jobProv.confirmJob(job.id);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
