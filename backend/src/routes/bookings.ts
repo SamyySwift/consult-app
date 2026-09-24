@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
+import { getInsurancePercentage } from '../settings';
 
 export const bookingsRouter = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'carpital_consult_super_secret_jwt_key_2026';
@@ -15,6 +16,18 @@ function extractUserId(req: Request): string | null {
   }
   return (req.body.userId || req.query.userId) as string | null;
 }
+
+// -------------------------------------------------------------
+// GET /api/bookings/settings - Public pricing settings for clients
+// -------------------------------------------------------------
+bookingsRouter.get('/settings', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    res.json({ insurance_percentage: await getInsurancePercentage() });
+  } catch (err: any) {
+    console.error('Error fetching booking settings:', err);
+    res.status(500).json({ error: 'Failed to fetch settings: ' + err.message });
+  }
+});
 
 // -------------------------------------------------------------
 // POST /api/bookings - Create new booking
@@ -32,9 +45,9 @@ bookingsRouter.post('/', async (req: Request, res: Response): Promise<void> => {
   const serviceType = b.service_type || b.serviceType || 'standard';
   const transportTier = b.transport_tier || b.transportTier || 'standard';
   const transportMode = b.transport_mode || b.transportMode || 'standard';
-  const totalAmount = b.total_amount ?? b.totalAmount;
+  let totalAmount = b.total_amount ?? b.totalAmount;
   const basePrice = b.base_price ?? b.basePrice ?? totalAmount;
-  const insuranceFee = b.insurance_fee ?? b.insuranceFee ?? b.insuranceAmount ?? 0;
+  let insuranceFee = b.insurance_fee ?? b.insuranceFee ?? b.insuranceAmount ?? 0;
   const hasInsurance = !!(b.has_insurance ?? b.hasInsurance);
   const pickupDateTime = b.pickup_datetime || b.pickupDateTime;
   const documentPaths = b.document_paths || b.documentPaths || [];
@@ -52,6 +65,18 @@ bookingsRouter.post('/', async (req: Request, res: Response): Promise<void> => {
   if (!pickupAddress || !dropoffAddress || !totalAmount) {
     res.status(400).json({ error: 'Pickup, dropoff, and total amount are required' });
     return;
+  }
+
+  // Recompute insurance with the admin-configured percentage of vehicle worth
+  if (hasInsurance && Number(vehicleValue) > 0) {
+    try {
+      const pct = await getInsurancePercentage();
+      const serverFee = Math.round(Number(vehicleValue) * (pct / 100));
+      totalAmount = Number(totalAmount) - Number(insuranceFee) + serverFee;
+      insuranceFee = serverFee;
+    } catch (err) {
+      console.error('Error loading insurance percentage, using client fee:', err);
+    }
   }
 
   // Generate unique booking reference: e.g. AM-847291

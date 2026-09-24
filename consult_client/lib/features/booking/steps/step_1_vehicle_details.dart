@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/booking_provider.dart';
 import '../models/booking_model.dart';
@@ -16,6 +17,40 @@ class _UpperCaseFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     return newValue.copyWith(text: newValue.text.toUpperCase());
+  }
+}
+
+final _thousandsFormat = NumberFormat.decimalPattern('en_US');
+
+/// Keeps digits only and inserts thousands separators (e.g. 15,000,000).
+class _ThousandsSeparatorFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return const TextEditingValue();
+    if (digits.length > 15) return oldValue;
+
+    // Count digits before the cursor so it stays in place after re-formatting.
+    final cursor = newValue.selection.end.clamp(0, newValue.text.length);
+    final digitsBeforeCursor =
+        newValue.text.substring(0, cursor).replaceAll(RegExp(r'[^0-9]'), '').length;
+
+    final formatted = _thousandsFormat.format(int.parse(digits));
+
+    var offset = 0;
+    var seen = 0;
+    while (offset < formatted.length && seen < digitsBeforeCursor) {
+      if (formatted[offset] != ',') seen++;
+      offset++;
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: offset),
+    );
   }
 }
 
@@ -57,7 +92,7 @@ class _Step1VehicleDetailsState extends State<Step1VehicleDetails> {
     _colorCtrl.text = draft.vehicleColor ?? '';
     _vinCtrl.text = (draft.vehicleVin ?? '').toUpperCase();
     if (draft.vehicleValue != null && draft.vehicleValue! > 0) {
-      _valueCtrl.text = draft.vehicleValue!.toStringAsFixed(0);
+      _valueCtrl.text = _thousandsFormat.format(draft.vehicleValue!.round());
     }
     _vinLength = _vinCtrl.text.length;
     _vinCtrl.addListener(() {
@@ -221,9 +256,10 @@ class _Step1VehicleDetailsState extends State<Step1VehicleDetails> {
 
             CustomTextField(
               label: 'Estimated Vehicle Worth / Price (₦) *',
-              hint: 'e.g. 15000000',
+              hint: 'e.g. 15,000,000',
               controller: _valueCtrl,
               keyboardType: TextInputType.number,
+              inputFormatters: [_ThousandsSeparatorFormatter()],
               validator: (v) {
                 final requiredErr = AppValidators.validateRequired(v, field: 'Vehicle worth');
                 if (requiredErr != null) return requiredErr;

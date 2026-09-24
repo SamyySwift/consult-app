@@ -26,22 +26,15 @@ class _Step4InsuranceState extends State<Step4Insurance> {
   void _submit(BuildContext context) {
     final pricingProvider = context.read<PricingProvider>();
     final draft = context.read<BookingProvider>().draft;
-    final config = pricingProvider.getConfigForServiceType(draft.serviceType.name) ?? 
-                   pricingProvider.getConfigForServiceType('standard');
-    
-    // Percentage rate (e.g. 1.5%)
-    double pctRate = 1.5;
-    if (config != null && config.insuranceRate > 0 && config.insuranceRate <= 100) {
-      pctRate = config.insuranceRate;
-    }
-    
+    final pctRate = pricingProvider.insurancePercentage;
+
     double vehicleVal = draft.vehicleValue ?? 0;
     double insuranceAmount = 0;
     if (_hasInsurance) {
       insuranceAmount = vehicleVal > 0 ? (vehicleVal * (pctRate / 100)) : 15000;
     }
     
-    context.read<BookingProvider>().updateInsurance(_hasInsurance, insuranceAmount);
+    context.read<BookingProvider>().updateInsurance(_hasInsurance, insuranceAmount, pctRate);
     widget.onNext();
   }
 
@@ -54,13 +47,7 @@ class _Step4InsuranceState extends State<Step4Insurance> {
       return Center(child: CircularProgressIndicator());
     }
     
-    final config = pricingProvider.getConfigForServiceType(draft.serviceType.name) ?? 
-                   pricingProvider.getConfigForServiceType('standard');
-    
-    double pctRate = 1.5;
-    if (config != null && config.insuranceRate > 0 && config.insuranceRate <= 100) {
-      pctRate = config.insuranceRate;
-    }
+    final pctRate = pricingProvider.insurancePercentage;
 
     final double vehicleValue = draft.vehicleValue ?? 0;
     final double calculatedInsurance = _hasInsurance

@@ -155,6 +155,18 @@ export async function initDatabase() {
       SELECT 'Truck / Van', 'Pickup trucks, cargo vans, and commercial units', 120000, 40000, 10000
       WHERE NOT EXISTS (SELECT 1 FROM public.pricing_config WHERE name = 'Truck / Van');
 
+      -- Global App Settings (Admin)
+      CREATE TABLE IF NOT EXISTS public.app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Insurance fee = vehicle worth x this percentage
+      INSERT INTO public.app_settings (key, value)
+      VALUES ('insurance_percentage', '1.5')
+      ON CONFLICT (key) DO NOTHING;
+
       CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON public.bookings(user_id);
       CREATE INDEX IF NOT EXISTS idx_bookings_driver_id ON public.bookings(driver_id);
       CREATE INDEX IF NOT EXISTS idx_bookings_status ON public.bookings(status);

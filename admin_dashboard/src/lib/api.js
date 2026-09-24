@@ -67,6 +67,28 @@ export async function savePricing(pricingList) {
   return res.json();
 }
 
+export async function fetchInsuranceSettings() {
+  const res = await fetch(`${API_BASE_URL}/api/admin/settings/insurance`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch insurance settings (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function saveInsuranceSettings(insurancePercentage) {
+  const res = await fetch(`${API_BASE_URL}/api/admin/settings/insurance`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ insurance_percentage: insurancePercentage }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to save insurance settings (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function fetchStats() {
   const res = await fetch(`${API_BASE_URL}/api/admin/stats`);
   if (!res.ok) {

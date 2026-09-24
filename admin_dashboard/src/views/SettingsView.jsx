@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { fetchPricing as apiFetchPricing, savePricing as apiSavePricing } from '../lib/api';
+import {
+  fetchPricing as apiFetchPricing,
+  savePricing as apiSavePricing,
+  fetchInsuranceSettings,
+  saveInsuranceSettings,
+} from '../lib/api';
 
 function formatAmount(value) {
   if (value === null || value === undefined) return '0';
@@ -18,10 +23,19 @@ export function SettingsView() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [insurancePct, setInsurancePct] = useState('');
 
   useEffect(() => {
     fetchPricing();
+    fetchInsuranceSettings()
+      .then((data) => setInsurancePct(String(data.insurance_percentage ?? '')))
+      .catch((err) => console.error('Error fetching insurance settings:', err));
   }, []);
+
+  const handleInsurancePctChange = (value) => {
+    // Allow digits with at most one decimal point and two decimal places
+    if (/^\d{0,3}(\.\d{0,2})?$/.test(value)) setInsurancePct(value);
+  };
 
   const fetchPricing = async () => {
     setLoading(true);
@@ -32,7 +46,6 @@ export function SettingsView() {
         ...p,
         base_price_str: formatAmount(p.base_price),
         enclosed_addon_str: formatAmount(p.enclosed_addon),
-        insurance_rate_str: formatAmount(p.insurance_rate),
       }));
       setPricingData(formatted);
     } catch (err) {
@@ -49,6 +62,12 @@ export function SettingsView() {
   };
 
   const handleSave = async () => {
+    const pct = parseFloat(insurancePct);
+    if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+      setMessage({ type: 'error', text: 'Insurance percentage must be between 0 and 100.' });
+      return;
+    }
+
     setSaving(true);
     setMessage(null);
     try {
@@ -56,10 +75,9 @@ export function SettingsView() {
         id: p.id,
         base_price: parseAmount(p.base_price_str),
         enclosed_addon: parseAmount(p.enclosed_addon_str),
-        insurance_rate: parseAmount(p.insurance_rate_str),
       }));
 
-      await apiSavePricing(payload);
+      await Promise.all([apiSavePricing(payload), saveInsuranceSettings(pct)]);
       setMessage({ type: 'success', text: 'Pricing configuration saved successfully.' });
       setTimeout(() => setMessage(null), 3000);
     } catch (err) {
@@ -101,6 +119,32 @@ export function SettingsView() {
         </div>
       )}
 
+      <div className="bg-navy-mid border border-navy-border rounded-xl p-5 mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="font-semibold text-text-primary text-[13px]">Insurance Percentage</div>
+            <div className="text-[11px] text-text-mid mt-0.5">
+              Insurance fee charged as a percentage of the client's estimated vehicle worth.
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              inputMode="decimal"
+              value={insurancePct}
+              onChange={(e) => handleInsurancePctChange(e.target.value)}
+              className="w-[100px] bg-navy border border-navy-border rounded-md px-3 py-2 text-[13px] text-text-primary focus:outline-none focus:border-info font-mono text-right"
+            />
+            <span className="text-text-mid text-[13px]">%</span>
+          </div>
+        </div>
+        {parseFloat(insurancePct) > 0 && (
+          <div className="text-[11px] text-text-mid mt-3">
+            e.g. a ₦10,000,000 vehicle will pay ₦{Math.round(100000 * parseFloat(insurancePct)).toLocaleString('en-US')} for insurance.
+          </div>
+        )}
+      </div>
+
       <div className="bg-navy-mid border border-navy-border rounded-xl overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -108,7 +152,6 @@ export function SettingsView() {
               <th className="p-4 font-medium w-1/4">Service Tier</th>
               <th className="p-4 font-medium">Base Price (₦)</th>
               <th className="p-4 font-medium">Enclosed Add-on (₦)</th>
-              <th className="p-4 font-medium">Insurance Rate (₦)</th>
             </tr>
           </thead>
           <tbody>
@@ -131,14 +174,6 @@ export function SettingsView() {
                     type="text"
                     value={p.enclosed_addon_str}
                     onChange={(e) => handleChange(i, 'enclosed_addon_str', e.target.value)}
-                    className="w-full max-w-[150px] bg-navy border border-navy-border rounded-md px-3 py-2 text-[13px] text-text-primary focus:outline-none focus:border-info font-mono"
-                  />
-                </td>
-                <td className="p-4">
-                  <input
-                    type="text"
-                    value={p.insurance_rate_str}
-                    onChange={(e) => handleChange(i, 'insurance_rate_str', e.target.value)}
                     className="w-full max-w-[150px] bg-navy border border-navy-border rounded-md px-3 py-2 text-[13px] text-text-primary focus:outline-none focus:border-info font-mono"
                   />
                 </td>

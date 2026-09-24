@@ -157,9 +157,10 @@ class BookingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateInsurance(bool hasInsurance, [double? insuranceAmount]) {
+  void updateInsurance(bool hasInsurance, [double? insuranceAmount, double? insurancePercentage]) {
     _draft.hasInsurance = hasInsurance;
     if (insuranceAmount != null) _draft.insuranceAmount = insuranceAmount;
+    if (insurancePercentage != null) _draft.insurancePercentage = insurancePercentage;
     notifyListeners();
   }
 

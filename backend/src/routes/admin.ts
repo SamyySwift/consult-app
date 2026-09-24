@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db';
+import { getInsurancePercentage, setInsurancePercentage } from '../settings';
 
 export const adminRouter = Router();
 
@@ -191,9 +192,9 @@ adminRouter.post('/pricing', async (req: Request, res: Response): Promise<void> 
       if (item.id) {
         await pool.query(
           `UPDATE public.pricing_config 
-           SET base_price = $1, enclosed_addon = $2, insurance_rate = $3, updated_at = NOW()
+           SET base_price = $1, enclosed_addon = $2, insurance_rate = COALESCE($3, insurance_rate), updated_at = NOW()
            WHERE id = $4`,
-          [item.base_price, item.enclosed_addon, item.insurance_rate, item.id]
+          [item.base_price, item.enclosed_addon, item.insurance_rate ?? null, item.id]
         );
       }
     }
@@ -203,6 +204,37 @@ adminRouter.post('/pricing', async (req: Request, res: Response): Promise<void> 
   } catch (err: any) {
     console.error('Error saving pricing:', err);
     res.status(500).json({ error: 'Failed to save pricing: ' + err.message });
+  }
+});
+
+// -------------------------------------------------------------
+// GET /api/admin/settings/insurance - Get insurance percentage
+// -------------------------------------------------------------
+adminRouter.get('/settings/insurance', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    res.json({ insurance_percentage: await getInsurancePercentage() });
+  } catch (err: any) {
+    console.error('Error fetching insurance settings:', err);
+    res.status(500).json({ error: 'Failed to fetch insurance settings: ' + err.message });
+  }
+});
+
+// -------------------------------------------------------------
+// POST /api/admin/settings/insurance - Save insurance percentage
+// -------------------------------------------------------------
+adminRouter.post('/settings/insurance', async (req: Request, res: Response): Promise<void> => {
+  const pct = Number(req.body.insurance_percentage);
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+    res.status(400).json({ error: 'Insurance percentage must be a number between 0 and 100' });
+    return;
+  }
+
+  try {
+    await setInsurancePercentage(pct);
+    res.json({ success: true, insurance_percentage: pct });
+  } catch (err: any) {
+    console.error('Error saving insurance settings:', err);
+    res.status(500).json({ error: 'Failed to save insurance settings: ' + err.message });
   }
 });
 
