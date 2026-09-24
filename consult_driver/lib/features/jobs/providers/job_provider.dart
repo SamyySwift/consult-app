@@ -259,11 +259,14 @@ class JobProvider extends ChangeNotifier {
   /// No timeLimit on any platform — it makes the stream throw a TimeoutException
   /// whenever a fix takes longer than the window (tunnels, underground car
   /// parks), which would kill location updates for the rest of the job.
+  /// Minimum movement in metres before a new position is sent to the client.
+  static const _locationDistanceFilterMeters = 2;
+
   LocationSettings _buildLocationSettings() {
     if (defaultTargetPlatform == TargetPlatform.android) {
       return AndroidSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 25,
+        distanceFilter: _locationDistanceFilterMeters,
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'Delivery in progress',
           notificationText: 'Sharing your location with the client.',
@@ -275,7 +278,7 @@ class JobProvider extends ChangeNotifier {
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return AppleSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 25,
+        distanceFilter: _locationDistanceFilterMeters,
         allowBackgroundLocationUpdates: true,
         showBackgroundLocationIndicator: true,
         pauseLocationUpdatesAutomatically: false,
@@ -283,9 +286,9 @@ class JobProvider extends ChangeNotifier {
       );
     }
 
-    return const LocationSettings(
+    return LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 25,
+      distanceFilter: _locationDistanceFilterMeters,
     );
   }
 
