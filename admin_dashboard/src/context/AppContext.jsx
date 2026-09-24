@@ -86,6 +86,8 @@ export function AppProvider({ children }) {
             serviceType: b.service_type || 'Standard',
             transportMode: b.transport_mode ? (b.transport_mode.includes('enclosed') ? 'Enclosed Transport' : 'Open Transport') : 'Open Transport',
             hasInsurance: !!b.has_insurance,
+            vehicleValue: Number(b.vehicle_value) || 0,
+            insuranceFee: Number(b.insurance_fee) || Number(b.insurance_amount) || 0,
             totalAmount: Number(b.total_amount) || 75000,
             status: normalizeStatus(b.status),
             createdAt: formatRelativeTime(b.created_at),

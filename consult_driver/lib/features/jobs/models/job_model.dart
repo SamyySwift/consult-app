@@ -37,6 +37,7 @@ class VehicleInfo {
   final String model;
   final String year;
   final String color;
+  final double vehicleValue;
 
   const VehicleInfo({
     required this.type,
@@ -44,6 +45,7 @@ class VehicleInfo {
     required this.model,
     required this.year,
     required this.color,
+    this.vehicleValue = 0,
   });
 
   String get displayName => '$year $make $model';
@@ -145,6 +147,14 @@ class JobModel {
     }
   }
 
+  /// Safely parses a value that may be a String or num into a double.
+  static double _parseDouble(dynamic value, double fallback) {
+    if (value == null) return fallback;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
   factory JobModel.fromSupabaseMap(Map<String, dynamic> map) {
     JobStatus parseStatus(String? s) {
       switch (s) {
@@ -224,25 +234,26 @@ class JobModel {
         model: map['vehicle_model']?.toString() ?? '',
         year: map['vehicle_year']?.toString() ?? '2024',
         color: map['vehicle_color']?.toString() ?? 'Black',
+        vehicleValue: _parseDouble(map['vehicle_value'], 0.0),
       ),
       pickup: JobLocation(
         address: map['pickup_address']?.toString() ?? 'Pickup Location',
-        lat: (map['pickup_lat'] ?? map['pickup_latitude'] as num?)?.toDouble() ?? 6.5244,
-        lng: (map['pickup_lng'] ?? map['pickup_longitude'] as num?)?.toDouble() ?? 3.3792,
+        lat: _parseDouble(map['pickup_lat'] ?? map['pickup_latitude'], 6.5244),
+        lng: _parseDouble(map['pickup_lng'] ?? map['pickup_longitude'], 3.3792),
         scheduledAt: map['pickup_datetime'] != null
             ? DateTime.tryParse(map['pickup_datetime'].toString())
             : (map['pickup_date'] != null ? DateTime.tryParse(map['pickup_date'].toString()) : null),
       ),
       dropoff: JobLocation(
         address: map['dropoff_address']?.toString() ?? 'Destination Location',
-        lat: (map['dropoff_lat'] ?? map['dropoff_latitude'] as num?)?.toDouble() ?? 9.0765,
-        lng: (map['dropoff_lng'] ?? map['dropoff_longitude'] as num?)?.toDouble() ?? 7.3986,
+        lat: _parseDouble(map['dropoff_lat'] ?? map['dropoff_latitude'], 9.0765),
+        lng: _parseDouble(map['dropoff_lng'] ?? map['dropoff_longitude'], 7.3986),
         scheduledAt: null,
       ),
       serviceType: parseServiceType(map['service_type'] ?? map['service_tier']),
       transportMode: parseTransportMode(map['transport_mode'] ?? map['transport_type']),
       hasInsurance: map['has_insurance'] ?? map['insurance_covered'] ?? false,
-      totalAmount: (map['total_amount'] ?? map['total_price'] as num?)?.toDouble() ?? 0.0,
+      totalAmount: _parseDouble(map['total_amount'] ?? map['total_price'], 0.0),
       status: parseStatus(map['status']),
       createdAt: map['created_at'] != null
           ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()

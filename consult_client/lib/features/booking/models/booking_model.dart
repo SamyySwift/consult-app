@@ -12,6 +12,7 @@ class VehicleDetails {
   final String year;
   final String color;
   final String vin;
+  final double vehicleValue;
 
   const VehicleDetails({
     required this.type,
@@ -20,6 +21,7 @@ class VehicleDetails {
     required this.year,
     required this.color,
     this.vin = '',
+    this.vehicleValue = 0,
   });
 
   String get displayName => '$year $make $model';
@@ -110,6 +112,16 @@ class BookingModel {
     }
   }
 
+  /// Safely parses a value that may be a String or num into a double.
+  /// This handles PostgreSQL NUMERIC columns which the pg Node.js driver
+  /// returns as strings.
+  static double _parseDouble(dynamic value, double fallback) {
+    if (value == null) return fallback;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
   factory BookingModel.fromSupabaseMap(Map<String, dynamic> json) {
     // Parse VehicleType
     VehicleType vehicleType = VehicleType.sedan;
@@ -184,27 +196,28 @@ class BookingModel {
         year: json['vehicle_year'] as String? ?? '',
         color: json['vehicle_color'] as String? ?? '',
         vin: json['vehicle_vin'] as String? ?? '',
+        vehicleValue: _parseDouble(json['vehicle_value'] ?? (json['vehicle_details'] is Map ? json['vehicle_details']['value'] : null), 0),
       ),
       pickup: BookingLocation(
         address: json['pickup_address'] as String? ?? '',
-        lat: (json['pickup_lat'] as num?)?.toDouble() ?? 6.5244,
-        lng: (json['pickup_lng'] as num?)?.toDouble() ?? 3.3792,
+        lat: _parseDouble(json['pickup_lat'], 6.5244),
+        lng: _parseDouble(json['pickup_lng'], 3.3792),
         scheduledDateTime: json['pickup_datetime'] != null
             ? DateTime.tryParse(json['pickup_datetime'] as String)
             : null,
       ),
       dropoff: BookingLocation(
         address: json['dropoff_address'] as String? ?? '',
-        lat: (json['dropoff_lat'] as num?)?.toDouble() ?? 9.0820,
-        lng: (json['dropoff_lng'] as num?)?.toDouble() ?? 8.6753,
+        lat: _parseDouble(json['dropoff_lat'], 9.0820),
+        lng: _parseDouble(json['dropoff_lng'], 8.6753),
       ),
       serviceType: serviceType,
       transportMode: transportMode,
       hasInsurance: json['has_insurance'] as bool? ?? false,
       documentPaths: docPaths,
-      basePrice: (json['base_price'] as num?)?.toDouble() ?? 75000,
-      insuranceFee: (json['insurance_fee'] as num?)?.toDouble() ?? 0,
-      totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 75000,
+      basePrice: _parseDouble(json['base_price'], 75000),
+      insuranceFee: _parseDouble(json['insurance_fee'], 0),
+      totalAmount: _parseDouble(json['total_amount'], 75000),
       status: status,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String) ?? DateTime.now()
@@ -213,8 +226,8 @@ class BookingModel {
       driverPhone: json['driver_phone'] as String?,
       paymentReference: json['payment_reference'] as String?,
       clientSignatureUrl: json['client_signature_url'] as String?,
-      driverLat: (json['driver_lat'] as num?)?.toDouble(),
-      driverLng: (json['driver_lng'] as num?)?.toDouble(),
+      driverLat: json['driver_lat'] != null ? _parseDouble(json['driver_lat'], 0) : null,
+      driverLng: json['driver_lng'] != null ? _parseDouble(json['driver_lng'], 0) : null,
     );
   }
 
@@ -227,6 +240,7 @@ class BookingModel {
         'vehicle_year': vehicle.year,
         'vehicle_color': vehicle.color,
         'vehicle_vin': vehicle.vin,
+        'vehicle_value': vehicle.vehicleValue,
         'pickup_address': pickup.address,
         'pickup_lat': pickup.lat,
         'pickup_lng': pickup.lng,
@@ -259,6 +273,7 @@ class BookingDraft {
   String? vehicleYear;
   String? vehicleColor;
   String? vehicleVin;
+  double? vehicleValue;
 
   String? pickupAddress;
   double? pickupLat;
@@ -279,7 +294,9 @@ class BookingDraft {
       vehicleMake != null &&
       vehicleModel != null &&
       vehicleYear != null &&
-      vehicleColor != null;
+      vehicleColor != null &&
+      vehicleValue != null &&
+      vehicleValue! > 0;
 
   bool get isLocationComplete =>
       pickupAddress != null &&
@@ -289,8 +306,17 @@ class BookingDraft {
   double basePrice = 75000;
   double enclosedAddon = 0;
   double insuranceAmount = 0;
+  double insurancePercentage = 1.5; // Default 1.5% of vehicle value
   
-  double get totalPrice => basePrice + enclosedAddon + insuranceAmount;
+  double get computedInsuranceFee {
+    if (!hasInsurance) return 0;
+    if (vehicleValue != null && vehicleValue! > 0) {
+      return vehicleValue! * (insurancePercentage / 100);
+    }
+    return insuranceAmount;
+  }
+
+  double get totalPrice => basePrice + enclosedAddon + computedInsuranceFee;
 
   Map<String, dynamic> toSupabaseInsertMap(String userId) {
     final bookingId = 'JB${100000 + Random().nextInt(900000)}';
@@ -303,6 +329,7 @@ class BookingDraft {
       'vehicle_year': vehicleYear?.isNotEmpty == true ? vehicleYear! : '2023',
       'vehicle_color': vehicleColor?.isNotEmpty == true ? vehicleColor! : 'Black',
       'vehicle_vin': vehicleVin ?? '',
+      'vehicle_value': vehicleValue ?? 0,
       'pickup_address': pickupAddress?.isNotEmpty == true ? pickupAddress! : 'Lagos, Nigeria',
       'pickup_lat': pickupLat ?? 6.5244,
       'pickup_lng': pickupLng ?? 3.3792,
@@ -315,7 +342,7 @@ class BookingDraft {
       'has_insurance': hasInsurance,
       'document_paths': documentPaths,
       'base_price': basePrice,
-      'insurance_fee': insuranceAmount,
+      'insurance_fee': computedInsuranceFee,
       'total_amount': totalPrice,
       'status': 'pending',
     };
@@ -333,6 +360,7 @@ class BookingDraft {
         year: vehicleYear!,
         color: vehicleColor!,
         vin: vehicleVin ?? '',
+        vehicleValue: vehicleValue ?? 0,
       ),
       pickup: BookingLocation(
         address: pickupAddress!,
@@ -350,7 +378,7 @@ class BookingDraft {
       hasInsurance: hasInsurance,
       documentPaths: documentPaths,
       basePrice: basePrice,
-      insuranceFee: insuranceAmount,
+      insuranceFee: computedInsuranceFee,
       totalAmount: totalPrice,
       status: BookingStatusEnum.pending,
       createdAt: DateTime.now(),

@@ -7,8 +7,9 @@ import '../models/job_model.dart';
 import '../../../core/network/api_client.dart';
 
 class JobProvider extends ChangeNotifier {
-  List<JobModel> _allJobs = generateMockJobs();
+  List<JobModel> _allJobs = [];
   bool _isLoading = false;
+  bool _hasLoadedFromApi = false;
   Timer? _pollingTimer;
   StreamSubscription<Position>? _positionStream;
 
@@ -50,6 +51,7 @@ class JobProvider extends ChangeNotifier {
             .map((item) => JobModel.fromSupabaseMap(item as Map<String, dynamic>))
             .toList();
         _allJobs = remoteJobs;
+        _hasLoadedFromApi = true;
 
         // Check if we need to resume location tracking
         if (hasActiveDelivery && activeJob?.status == JobStatus.inTransit) {
@@ -60,7 +62,8 @@ class JobProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Error fetching jobs from Railway API: $e');
-      if (_allJobs.isEmpty) {
+      // Only use mock data if we've never successfully loaded from API
+      if (!_hasLoadedFromApi && _allJobs.isEmpty) {
         _allJobs = generateMockJobs();
       }
     } finally {

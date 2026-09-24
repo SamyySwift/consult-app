@@ -45,6 +45,7 @@ class _Step6ReviewPayState extends State<Step6ReviewPay> {
                 vehicle: '${draft.vehicleYear} ${draft.vehicleMake} ${draft.vehicleModel}',
                 vehicleType: draft.vehicleType?.toString().split('.').last ?? '',
                 vehicleColor: draft.vehicleColor ?? '',
+                vehicleWorth: _fmt(draft.vehicleValue ?? 0),
                 pickup: draft.pickupAddress ?? '',
                 dropoff: draft.dropoffAddress ?? '',
                 pickupDate: draft.pickupDateTime != null
@@ -52,7 +53,7 @@ class _Step6ReviewPayState extends State<Step6ReviewPay> {
                     : '',
                 service: _serviceLabel(draft.serviceType),
                 transport: draft.transportMode == TransportMode.enclosed ? 'Enclosed' : 'Open',
-                insurance: draft.hasInsurance ? 'Yes (${_fmt(draft.insuranceAmount)})' : 'No',
+                insurance: draft.hasInsurance ? 'Yes (${_fmt(draft.computedInsuranceFee)})' : 'No',
               ),
 
               SizedBox(height: 16),
@@ -61,7 +62,7 @@ class _Step6ReviewPayState extends State<Step6ReviewPay> {
               _PriceCard(
                 basePrice: draft.basePrice,
                 enclosedAddon: draft.enclosedAddon,
-                insuranceFee: draft.insuranceAmount,
+                insuranceFee: draft.computedInsuranceFee,
                 total: draft.totalPrice,
                 fmtFn: _fmt,
               ),
@@ -179,9 +180,9 @@ class _PaymentMethod {
 }
 
 class _SummaryCard extends StatelessWidget {
-  final String vehicle, vehicleType, vehicleColor, pickup, dropoff, pickupDate, service, transport, insurance;
+  final String vehicle, vehicleType, vehicleColor, vehicleWorth, pickup, dropoff, pickupDate, service, transport, insurance;
   const _SummaryCard({
-    required this.vehicle, required this.vehicleType, required this.vehicleColor,
+    required this.vehicle, required this.vehicleType, required this.vehicleColor, required this.vehicleWorth,
     required this.pickup, required this.dropoff, required this.pickupDate,
     required this.service, required this.transport, required this.insurance,
   });
@@ -199,6 +200,7 @@ class _SummaryCard extends StatelessWidget {
         children: [
           _SummaryRow(icon: Icons.directions_car_rounded, label: 'Vehicle', value: vehicle),
           _SummaryRow(icon: Icons.palette_rounded, label: 'Color', value: vehicleColor),
+          _SummaryRow(icon: Icons.payments_rounded, label: 'Vehicle Worth', value: vehicleWorth),
           _SummaryRow(icon: Icons.radio_button_on, label: 'Pickup', value: pickup, valueMaxLines: 2),
           _SummaryRow(icon: Icons.location_on_rounded, label: 'Delivery', value: dropoff, valueMaxLines: 2),
           if (pickupDate.isNotEmpty)

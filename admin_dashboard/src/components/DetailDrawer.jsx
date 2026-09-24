@@ -156,6 +156,9 @@ export function DetailDrawer() {
                 <div className="text-[11px] font-medium text-text-mid uppercase tracking-[0.06em] mb-3 pb-2 border-b border-navy-border">Vehicle</div>
                 <div className="flex justify-between text-[13px] py-1.5"><span className="text-text-mid">Vehicle</span><span className="text-text-primary font-medium">{job.vehicle.year} {job.vehicle.make} {job.vehicle.model}</span></div>
                 <div className="flex justify-between text-[13px] py-1.5"><span className="text-text-mid">Colour</span><span className="text-text-primary font-medium">{job.vehicle.color}</span></div>
+                {job.vehicleValue > 0 && (
+                  <div className="flex justify-between text-[13px] py-1.5"><span className="text-text-mid">Vehicle Worth</span><span className="text-text-primary font-medium font-mono">₦{job.vehicleValue.toLocaleString('en-NG')}</span></div>
+                )}
                 <div className="flex justify-between text-[13px] py-1.5"><span className="text-text-mid">Transport</span><span className="text-text-primary font-medium">{job.transportMode}</span></div>
                 <div className="flex justify-between text-[13px] py-1.5"><span className="text-text-mid">Insurance</span><span className="text-text-primary font-medium">{job.hasInsurance ? '✓ Covered' : '— None'}</span></div>
               </div>
@@ -169,7 +172,10 @@ export function DetailDrawer() {
 
               <div>
                 <div className="text-[11px] font-medium text-text-mid uppercase tracking-[0.06em] mb-3 pb-2 border-b border-navy-border">Financials</div>
-                <div className="flex justify-between text-[13px] py-1.5"><span className="text-text-mid">Amount</span><span className="text-amber font-mono font-medium tracking-[0.02em]">₦{(job.totalAmount || 0).toLocaleString('en-NG')}</span></div>
+                <div className="flex justify-between text-[13px] py-1.5"><span className="text-text-mid">Total Amount</span><span className="text-amber font-mono font-medium tracking-[0.02em]">₦{(job.totalAmount || 0).toLocaleString('en-NG')}</span></div>
+                {job.hasInsurance && job.insuranceFee > 0 && (
+                  <div className="flex justify-between text-[13px] py-1.5"><span className="text-text-mid">Insurance Fee</span><span className="text-text-primary font-mono font-medium">₦{(job.insuranceFee || 0).toLocaleString('en-NG')}</span></div>
+                )}
                 <div className="flex justify-between text-[13px] py-1.5"><span className="text-text-mid">Service</span><span className="text-text-primary font-medium">{job.serviceType}</span></div>
               </div>
 

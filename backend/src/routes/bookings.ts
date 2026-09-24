@@ -47,6 +47,7 @@ bookingsRouter.post('/', async (req: Request, res: Response): Promise<void> => {
   const vehicleYear = b.vehicle_year || b.vehicleYear || vehicleDetails.year || '2023';
   const vehicleColor = b.vehicle_color || b.vehicleColor || vehicleDetails.color || 'Silver';
   const vehicleVin = b.vehicle_vin || b.vehicleVin || vehicleDetails.vin || '';
+  const vehicleValue = b.vehicle_value ?? b.vehicleValue ?? vehicleDetails.value ?? 0;
 
   if (!pickupAddress || !dropoffAddress || !totalAmount) {
     res.status(400).json({ error: 'Pickup, dropoff, and total amount are required' });
@@ -85,10 +86,11 @@ bookingsRouter.post('/', async (req: Request, res: Response): Promise<void> => {
         document_paths,
         has_insurance,
         insurance_amount,
-        pickup_datetime
+        pickup_datetime,
+        vehicle_value
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'pending',
-        $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+        $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
       )
       RETURNING *`,
       [
@@ -117,6 +119,7 @@ bookingsRouter.post('/', async (req: Request, res: Response): Promise<void> => {
         hasInsurance,
         insuranceFee,
         pickupDateTime || null,
+        vehicleValue,
       ]
     );
 

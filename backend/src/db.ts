@@ -111,9 +111,9 @@ export async function initDatabase() {
       ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS driver_lng DOUBLE PRECISION;
       ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS document_paths JSONB DEFAULT '[]'::jsonb;
       ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS has_insurance BOOLEAN DEFAULT FALSE;
-      ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS insurance_amount NUMERIC(12, 2) DEFAULT 0;
       ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS base_price NUMERIC(12, 2) DEFAULT 0;
       ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS insurance_fee NUMERIC(12, 2) DEFAULT 0;
+      ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS vehicle_value NUMERIC(14, 2) DEFAULT 0;
       ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS vehicle_type TEXT;
       ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS vehicle_make TEXT;
       ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS vehicle_model TEXT;

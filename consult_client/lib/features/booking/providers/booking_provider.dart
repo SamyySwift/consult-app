@@ -109,6 +109,7 @@ class BookingProvider extends ChangeNotifier {
     String? year,
     String? color,
     String? vin,
+    double? vehicleValue,
   }) {
     _draft.vehicleType = type ?? _draft.vehicleType;
     _draft.vehicleMake = make ?? _draft.vehicleMake;
@@ -116,6 +117,7 @@ class BookingProvider extends ChangeNotifier {
     _draft.vehicleYear = year ?? _draft.vehicleYear;
     _draft.vehicleColor = color ?? _draft.vehicleColor;
     _draft.vehicleVin = vin ?? _draft.vehicleVin;
+    _draft.vehicleValue = vehicleValue ?? _draft.vehicleValue;
     notifyListeners();
   }
 

@@ -29,9 +29,16 @@ class _Step4InsuranceState extends State<Step4Insurance> {
     final config = pricingProvider.getConfigForServiceType(draft.serviceType.name) ?? 
                    pricingProvider.getConfigForServiceType('standard');
     
+    // Percentage rate (e.g. 1.5%)
+    double pctRate = 1.5;
+    if (config != null && config.insuranceRate > 0 && config.insuranceRate <= 100) {
+      pctRate = config.insuranceRate;
+    }
+    
+    double vehicleVal = draft.vehicleValue ?? 0;
     double insuranceAmount = 0;
     if (_hasInsurance) {
-      insuranceAmount = config?.insuranceRate ?? 15000;
+      insuranceAmount = vehicleVal > 0 ? (vehicleVal * (pctRate / 100)) : 15000;
     }
     
     context.read<BookingProvider>().updateInsurance(_hasInsurance, insuranceAmount);
@@ -49,10 +56,20 @@ class _Step4InsuranceState extends State<Step4Insurance> {
     
     final config = pricingProvider.getConfigForServiceType(draft.serviceType.name) ?? 
                    pricingProvider.getConfigForServiceType('standard');
-    final double insuranceRate = config?.insuranceRate ?? 15000;
+    
+    double pctRate = 1.5;
+    if (config != null && config.insuranceRate > 0 && config.insuranceRate <= 100) {
+      pctRate = config.insuranceRate;
+    }
+
+    final double vehicleValue = draft.vehicleValue ?? 0;
+    final double calculatedInsurance = _hasInsurance
+        ? (vehicleValue > 0 ? (vehicleValue * (pctRate / 100)) : 15000)
+        : 0;
     
     final currencyFormatter = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 0);
-    final formattedRate = currencyFormatter.format(insuranceRate);
+    final formattedInsuranceFee = currencyFormatter.format(calculatedInsurance > 0 ? calculatedInsurance : (vehicleValue * (pctRate / 100)));
+    final formattedVehicleValue = currencyFormatter.format(vehicleValue);
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(24),
@@ -73,10 +90,11 @@ class _Step4InsuranceState extends State<Step4Insurance> {
             child: _InsuranceCard(
               isSelected: _hasInsurance,
               title: 'Add Insurance Coverage',
-              subtitle: 'Your vehicle is covered for any damage or loss during transit.',
-              price: formattedRate,
+              subtitle: 'Covered at $pctRate% of your vehicle\'s declared worth ($formattedVehicleValue).',
+              price: formattedInsuranceFee,
               features: [
-                'Full replacement value coverage',
+                'Full replacement value coverage based on $formattedVehicleValue vehicle worth',
+                'Rate: $pctRate% of declared vehicle value',
                 'Damage from accidents & collisions',
                 'Theft & vandalism protection',
                 'Weather and natural disaster cover',
@@ -146,7 +164,7 @@ class _Step4InsuranceState extends State<Step4Insurance> {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Great choice! Your vehicle is protected for $formattedRate added to your booking total.',
+                      'Great choice! Your vehicle ($formattedVehicleValue worth) is protected for $formattedInsuranceFee ($pctRate%) added to your booking total.',
                       style: TextStyle(fontSize: 12, color: context.colors.success, fontWeight: FontWeight.w500),
                     ),
                   ),

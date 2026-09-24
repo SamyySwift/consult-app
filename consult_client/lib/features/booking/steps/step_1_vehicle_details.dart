@@ -42,6 +42,7 @@ class _Step1VehicleDetailsState extends State<Step1VehicleDetails> {
   final _yearCtrl = TextEditingController();
   final _colorCtrl = TextEditingController();
   final _vinCtrl = TextEditingController();
+  final _valueCtrl = TextEditingController();
   VehicleType? _selectedType;
   int _vinLength = 0;
 
@@ -55,6 +56,9 @@ class _Step1VehicleDetailsState extends State<Step1VehicleDetails> {
     _yearCtrl.text = draft.vehicleYear ?? '';
     _colorCtrl.text = draft.vehicleColor ?? '';
     _vinCtrl.text = (draft.vehicleVin ?? '').toUpperCase();
+    if (draft.vehicleValue != null && draft.vehicleValue! > 0) {
+      _valueCtrl.text = draft.vehicleValue!.toStringAsFixed(0);
+    }
     _vinLength = _vinCtrl.text.length;
     _vinCtrl.addListener(() {
       setState(() => _vinLength = _vinCtrl.text.length);
@@ -68,6 +72,7 @@ class _Step1VehicleDetailsState extends State<Step1VehicleDetails> {
     _yearCtrl.dispose();
     _colorCtrl.dispose();
     _vinCtrl.dispose();
+    _valueCtrl.dispose();
     super.dispose();
   }
 
@@ -80,6 +85,8 @@ class _Step1VehicleDetailsState extends State<Step1VehicleDetails> {
     }
     if (!_formKey.currentState!.validate()) return;
 
+    final parsedValue = double.tryParse(_valueCtrl.text.replaceAll(',', '').trim()) ?? 0;
+
     context.read<BookingProvider>().updateVehicleDetails(
           type: _selectedType,
           make: _makeCtrl.text.trim(),
@@ -87,6 +94,7 @@ class _Step1VehicleDetailsState extends State<Step1VehicleDetails> {
           year: _yearCtrl.text.trim(),
           color: _colorCtrl.text.trim(),
           vin: _vinCtrl.text.trim(),
+          vehicleValue: parsedValue,
         );
     widget.onNext();
   }
@@ -207,6 +215,30 @@ class _Step1VehicleDetailsState extends State<Step1VehicleDetails> {
                   ),
                 ),
               ],
+            ),
+
+            SizedBox(height: 16),
+
+            CustomTextField(
+              label: 'Estimated Vehicle Worth / Price (₦) *',
+              hint: 'e.g. 15000000',
+              controller: _valueCtrl,
+              keyboardType: TextInputType.number,
+              validator: (v) {
+                final requiredErr = AppValidators.validateRequired(v, field: 'Vehicle worth');
+                if (requiredErr != null) return requiredErr;
+                final val = double.tryParse(v!.replaceAll(',', '').trim());
+                if (val == null || val <= 0) {
+                  return 'Please enter a valid vehicle value in Naira';
+                }
+                return null;
+              },
+              textInputAction: TextInputAction.next,
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Used to calculate insurance coverage fee if insurance is opted for',
+              style: TextStyle(fontSize: 12, color: context.colors.textLight),
             ),
 
             SizedBox(height: 16),
