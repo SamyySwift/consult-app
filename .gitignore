@@ -10,7 +10,7 @@ dist/
 .npm
 *.log
 
-# Flutter / Dart
+# Flutter / Dart / Locks
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
@@ -18,6 +18,9 @@ dist/
 .pub-cache/
 .pub/
 build/
+*.lock
+pubspec.lock
+Podfile.lock
 
 # iOS
 **/ios/Pods/
