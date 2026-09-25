@@ -162,7 +162,7 @@ class ProofOfHandoverDocumentView extends StatelessWidget {
                             'Digitally Signed upon delivery',
                             style: TextStyle(
                               color: Colors.black54,
-                              fontSize: 10,
+                              fontSize: 11,
                               fontStyle: FontStyle.italic,
                             ),
                           ),
@@ -221,7 +221,7 @@ class ProofOfHandoverDocumentView extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.black38,
-                            fontSize: 10,
+                            fontSize: 11,
                           ),
                         ),
                       ],
@@ -273,7 +273,7 @@ class _InfoLabel extends StatelessWidget {
           label,
           style: const TextStyle(
             color: Colors.black45,
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.8,
           ),

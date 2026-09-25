@@ -1,20 +1,36 @@
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../core/theme/driver_colors.dart';
+import '../../../core/network/route_service.dart';
 import '../../../core/widgets/driver_button.dart';
+import '../../../core/widgets/glass.dart';
 import '../../../core/widgets/location_required_banner.dart';
 import '../../../core/services/driver_location_access.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/formatters.dart';
+import '../../../core/utils/links.dart';
+import '../../../core/widgets/surface.dart';
 import '../providers/job_provider.dart';
 import '../models/job_model.dart';
+import '../widgets/job_ui.dart';
 import 'delivery_acknowledgement_sheet.dart';
 import 'pickup_condition_form.dart';
 
 class ActiveJobScreen extends StatelessWidget {
   const ActiveJobScreen({super.key});
+
+  void _goBack(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.dashboard);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,224 +40,74 @@ class ActiveJobScreen extends StatelessWidget {
     if (job == null) {
       return Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(
-          backgroundColor: Colors.black,
-          title: const Text(
-            'Active Mission',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-          ),
-        ),
-        body: const Center(
-          child: Text(
-            'No active mission selected.',
-            style: TextStyle(color: Colors.white70, fontSize: 16),
-          ),
+        body: Stack(
+          children: [
+            const Positioned.fill(child: AuroraBackground()),
+            Column(
+              children: [
+                GlassPageHeader(
+                  title: 'Active Mission',
+                  showBack: true,
+                  onBack: () => _goBack(context),
+                ),
+                const Expanded(
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: GlassEmptyState(
+                        icon: Icons.navigation_outlined,
+                        title: 'No active mission selected.',
+                        subtitle: 'Confirm an assigned job to start navigating it here.',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       );
     }
-
-    final pickup = LatLng(job.pickup.lat, job.pickup.lng);
-    final dropoff = LatLng(job.dropoff.lat, job.dropoff.lng);
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Map Background with dark tone overlay
-          FlutterMap(
-            options: MapOptions(
-              initialCenter: pickup,
-              initialZoom: 13.0,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.carpitalconsult.driver',
-              ),
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: [pickup, dropoff],
-                    color: DriverColors.accent,
-                    strokeWidth: 4,
-                    pattern: StrokePattern.dashed(segments: const [10, 10]),
-                  ),
-                ],
-              ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: pickup,
-                    width: 40,
-                    height: 40,
-                    child: const Icon(Icons.location_on, color: DriverColors.accent, size: 40),
-                  ),
-                  Marker(
-                    point: dropoff,
-                    width: 40,
-                    height: 40,
-                    child: const Icon(Icons.flag_rounded, color: Colors.white, size: 36),
-                  ),
-                ],
-              ),
-            ],
-          ),
+          Positioned.fill(child: _JobMap(job: job)),
 
           // Location warning + back button
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            child: Consumer<JobProvider>(
-              builder: (context, prov, _) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const LocationRequiredBanner(),
-                  Padding(
-                    // The banner already clears the status bar when it's shown
-                    padding: EdgeInsets.only(
-                      left: 16,
-                      top: prov.locationBlocked ? 10 : MediaQuery.of(context).padding.top + 10,
-                    ),
-                    child: CircleAvatar(
-                      backgroundColor: const Color(0xFF141414),
-                      child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white),
-                        onPressed: () {
-                          if (context.canPop()) {
-                            context.pop();
-                          } else {
-                            context.go(AppRoutes.dashboard);
-                          }
-                        },
-                      ),
-                    ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const LocationRequiredBanner(),
+                Padding(
+                  // The banner already clears the status bar when it's shown
+                  padding: EdgeInsets.only(
+                    left: 16,
+                    top: prov.locationBlocked ? 10 : MediaQuery.of(context).padding.top + 10,
                   ),
-                ],
-              ),
+                  child: GlassIconButton(
+                    icon: Icons.chevron_left_rounded,
+                    semanticLabel: 'Back',
+                    onTap: () => _goBack(context),
+                  ),
+                ),
+              ],
             ),
           ),
 
-          // Job Status Sheet (Tesla Carbon UI)
+          // Job status sheet
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: const Color(0xFF111111),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-                border: Border.all(color: const Color(0xFF222222)),
-                boxShadow: const [
-                  BoxShadow(color: Colors.black87, blurRadius: 30, offset: Offset(0, -10)),
-                ],
-              ),
-              child: SafeArea(
-                top: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Handle
-                    Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF333333),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Customer info
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: const Color(0xFF202020),
-                          radius: 24,
-                          child: Text(
-                            job.customerName?.substring(0, 1).toUpperCase() ?? 'C',
-                            style: const TextStyle(
-                              color: DriverColors.accent,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                job.customerName ?? 'Client',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                job.customerPhone ?? 'No phone provided',
-                                style: const TextStyle(color: Color(0xFF888888), fontSize: 13),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () {},
-                          icon: const Icon(Icons.phone_rounded, color: Colors.black, size: 20),
-                          style: IconButton.styleFrom(
-                            backgroundColor: DriverColors.accent,
-                            padding: const EdgeInsets.all(12),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    const Divider(color: Color(0xFF1E1E1E), height: 1),
-                    const SizedBox(height: 18),
-
-                    // Vehicle details
-                    Row(
-                      children: [
-                        Icon(job.vehicle.icon, color: DriverColors.accent, size: 22),
-                        const SizedBox(width: 12),
-                        Text(
-                          job.vehicle.displayName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E1E1E),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            job.serviceLabel,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Status Actions
-                    _buildStatusAction(context, prov, job),
-                  ],
-                ),
-              ),
+            child: _JobSheet(
+              job: job,
+              action: _buildStatusAction(context, prov, job),
             ),
           ),
         ],
@@ -323,5 +189,388 @@ class ActiveJobScreen extends StatelessWidget {
       default:
         return const SizedBox.shrink();
     }
+  }
+}
+
+// ── Map ───────────────────────────────────────────────────────────────────
+
+/// Full-screen map with the road route, pickup and drop-off markers, and the
+/// driver's own live position.
+class _JobMap extends StatefulWidget {
+  final JobModel job;
+  const _JobMap({required this.job});
+
+  @override
+  State<_JobMap> createState() => _JobMapState();
+}
+
+class _JobMapState extends State<_JobMap> {
+  // Roughly the height of the bottom sheet, so fitted routes stay visible.
+  static const _sheetAllowance = 400.0;
+
+  final MapController _mapController = MapController();
+  bool _mapReady = false;
+  RoadRoute? _route;
+
+  LatLng get _pickup => LatLng(widget.job.pickup.lat, widget.job.pickup.lng);
+  LatLng get _dropoff => LatLng(widget.job.dropoff.lat, widget.job.dropoff.lng);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRoute();
+  }
+
+  @override
+  void didUpdateWidget(covariant _JobMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.job.id != widget.job.id) {
+      setState(() => _route = null);
+      _loadRoute();
+    }
+  }
+
+  Future<void> _loadRoute() async {
+    final jobId = widget.job.id;
+    final route = await RouteService.instance.fetch(_pickup, _dropoff);
+    if (!mounted || widget.job.id != jobId || route == null) return;
+    setState(() => _route = route);
+    _fitRoute();
+  }
+
+  void _fitRoute() {
+    if (!_mapReady) return;
+    _mapController.fitCamera(
+      CameraFit.coordinates(
+        coordinates: [_pickup, _dropoff, ...?_route?.points],
+        padding: EdgeInsets.fromLTRB(40, MediaQuery.paddingOf(context).top + 90, 40, _sheetAllowance),
+        maxZoom: 15,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasMapbox = AppConstants.mapboxToken != null;
+    final driverPosition = context.read<JobProvider>().driverPosition;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCameraFit: CameraFit.coordinates(
+                coordinates: [_pickup, _dropoff],
+                padding: EdgeInsets.fromLTRB(40, 120, 40, _sheetAllowance),
+                maxZoom: 15,
+              ),
+              backgroundColor: const Color(0xFF0E0F0F),
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+              ),
+              onMapReady: () {
+                _mapReady = true;
+                if (_route != null) _fitRoute();
+              },
+            ),
+            children: [
+              _tileLayer(),
+              PolylineLayer(polylines: _polylines()),
+              MarkerLayer(markers: _endpointMarkers()),
+              ValueListenableBuilder<Position?>(
+                valueListenable: driverPosition,
+                builder: (context, position, _) => MarkerLayer(
+                  markers: [
+                    if (position != null)
+                      Marker(
+                        point: LatLng(position.latitude, position.longitude),
+                        width: 48,
+                        height: 48,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: DriverColors.accentGradient,
+                            border: Border.all(color: Colors.black, width: 2),
+                            boxShadow: [
+                              BoxShadow(color: DriverColors.accent.withValues(alpha: 0.6), blurRadius: 18),
+                            ],
+                          ),
+                          child: const Icon(Icons.local_shipping_rounded, color: Colors.black, size: 22),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Show the whole route + map credit, top right under the status bar.
+        Positioned(
+          top: MediaQuery.paddingOf(context).top + 10,
+          right: 16,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              GlassIconButton(
+                icon: Icons.zoom_out_map_rounded,
+                semanticLabel: 'Show whole route',
+                onTap: _fitRoute,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                hasMapbox ? '© Mapbox © OpenStreetMap' : '© OpenStreetMap',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.white.withValues(alpha: 0.6),
+                  shadows: const [Shadow(color: Colors.black, blurRadius: 4)],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _tileLayer() {
+    final token = AppConstants.mapboxToken;
+    if (token == null) {
+      return TileLayer(
+        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        userAgentPackageName: 'com.carpitalconsult.driver',
+      );
+    }
+    return TileLayer(
+      urlTemplate:
+          'https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}@2x?access_token={accessToken}',
+      additionalOptions: {'accessToken': token},
+      tileSize: 512,
+      zoomOffset: -1,
+      userAgentPackageName: 'com.carpitalconsult.driver',
+    );
+  }
+
+  List<Polyline> _polylines() {
+    final route = _route;
+    if (route == null) {
+      // No road route yet (or routing unavailable): a straight dashed line.
+      return [
+        Polyline(
+          points: [_pickup, _dropoff],
+          color: DriverColors.accent.withValues(alpha: 0.8),
+          strokeWidth: 3,
+          pattern: StrokePattern.dashed(segments: const [10, 8]),
+        ),
+      ];
+    }
+    return [
+      Polyline(points: route.points, color: DriverColors.accent.withValues(alpha: 0.22), strokeWidth: 14),
+      Polyline(points: route.points, color: DriverColors.accent, strokeWidth: 4),
+    ];
+  }
+
+  List<Marker> _endpointMarkers() {
+    return [
+      Marker(
+        point: _pickup,
+        width: 30,
+        height: 30,
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: DriverColors.accent.withValues(alpha: 0.25),
+          ),
+          alignment: Alignment.center,
+          child: Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: DriverColors.accent,
+              border: Border.all(color: Colors.black, width: 2),
+              boxShadow: [BoxShadow(color: DriverColors.accent.withValues(alpha: 0.7), blurRadius: 10)],
+            ),
+          ),
+        ),
+      ),
+      Marker(
+        point: _dropoff,
+        width: 40,
+        height: 40,
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF1A1C1B),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.5),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 8)],
+          ),
+          child: const Icon(Icons.flag_rounded, color: Colors.white, size: 20),
+        ),
+      ),
+    ];
+  }
+}
+
+// ── Bottom sheet ──────────────────────────────────────────────────────────
+
+class _JobSheet extends StatelessWidget {
+  final JobModel job;
+  final Widget action;
+
+  const _JobSheet({required this.job, required this.action});
+
+  @override
+  Widget build(BuildContext context) {
+    const radius = BorderRadius.vertical(top: Radius.circular(32));
+
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(22, 10, 22, 22),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            color: const Color(0xE60D0E0E),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // Journey progress
+                Row(
+                  children: [
+                    JobStatusChip(job: job),
+                    const Spacer(),
+                    Text(
+                      'Step ${job.status.stage} of ${JobStage.stageCount}',
+                      style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.5)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SegmentProgressBar(total: JobStage.stageCount, filled: job.status.stage),
+                const SizedBox(height: 20),
+
+                // Customer
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: DriverColors.accent.withValues(alpha: 0.12),
+                      ),
+                      child: Text(
+                        job.customerName?.substring(0, 1).toUpperCase() ?? 'C',
+                        style: const TextStyle(
+                          color: DriverColors.accentLight,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            job.customerName ?? 'Client',
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Colors.white),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            job.customerPhone ?? 'No phone provided',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                    GlassIconButton(
+                      icon: Icons.phone_rounded,
+                      iconColor: DriverColors.accent,
+                      semanticLabel: 'Call client',
+                      // Disabled when the booking has no phone number.
+                      onTap: (job.customerPhone?.trim().isNotEmpty ?? false)
+                          ? () => openLink(
+                              context,
+                              Uri(
+                                scheme: 'tel',
+                                path: job.customerPhone!.replaceAll(
+                                  RegExp(r'[^\d+]'),
+                                  '',
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Vehicle + route
+                SurfaceCard(
+                  radius: 22,
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(job.vehicle.icon, color: DriverColors.accentLight, size: 22),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              job.vehicle.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Colors.white),
+                            ),
+                          ),
+                          Text(
+                            '#${shortRef(job.id)}',
+                            style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.55)),
+                          ),
+                          const SizedBox(width: 8),
+                          FlatChip(label: job.serviceLabel),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      JobRouteLines(job: job),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Status action
+                action,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

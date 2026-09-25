@@ -23,31 +23,23 @@ final _router = GoRouter(
   routes: [
     GoRoute(
       path: AppConstants.routeSplash,
-      builder: (context, state) => Theme(
-        data: AppTheme.darkTheme,
-        child: const SplashScreen(),
-      ),
+      builder: (context, state) =>
+          Theme(data: AppTheme.darkTheme, child: const SplashScreen()),
     ),
     GoRoute(
       path: AppConstants.routeOnboarding,
-      builder: (context, state) => Theme(
-        data: AppTheme.darkTheme,
-        child: const OnboardingScreen(),
-      ),
+      builder: (context, state) =>
+          Theme(data: AppTheme.darkTheme, child: const OnboardingScreen()),
     ),
     GoRoute(
       path: AppConstants.routeLogin,
-      builder: (context, state) => Theme(
-        data: AppTheme.darkTheme,
-        child: const LoginScreen(),
-      ),
+      builder: (context, state) =>
+          Theme(data: AppTheme.darkTheme, child: const LoginScreen()),
     ),
     GoRoute(
       path: AppConstants.routeRegister,
-      builder: (context, state) => Theme(
-        data: AppTheme.darkTheme,
-        child: const RegisterScreen(),
-      ),
+      builder: (context, state) =>
+          Theme(data: AppTheme.darkTheme, child: const RegisterScreen()),
     ),
     GoRoute(
       path: AppConstants.routeOtp,
@@ -61,10 +53,8 @@ final _router = GoRouter(
     ),
     GoRoute(
       path: AppConstants.routeForgotPassword,
-      builder: (context, state) => Theme(
-        data: AppTheme.darkTheme,
-        child: const ForgotPasswordScreen(),
-      ),
+      builder: (context, state) =>
+          Theme(data: AppTheme.darkTheme, child: const ForgotPasswordScreen()),
     ),
     GoRoute(
       path: AppConstants.routeBookingNew,
@@ -74,34 +64,61 @@ final _router = GoRouter(
       path: AppConstants.routeNotifications,
       builder: (context, state) => const NotificationsScreen(),
     ),
-    ShellRoute(
-      builder: (context, state, child) => MainShell(child: child),
-      routes: [
-        GoRoute(
-          path: AppConstants.routeHome,
-          builder: (context, state) => const HomeScreen(),
+    // Each tab is its own branch so it keeps its scroll position and
+    // navigation stack while another tab is showing.
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) =>
+          MainShell(navigationShell: navigationShell),
+      branches: [
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppConstants.routeHome,
+              builder: (context, state) => const HomeScreen(),
+            ),
+          ],
         ),
-        GoRoute(
-          path: AppConstants.routeBookings,
-          builder: (context, state) => const MyBookingsScreen(),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppConstants.routeBookings,
+              builder: (context, state) => MyBookingsScreen(
+                initialTab: state.uri.queryParameters['tab'] == 'active'
+                    ? 1
+                    : 0,
+              ),
+            ),
+          ],
         ),
-        GoRoute(
-          path: AppConstants.routeTrack,
-          builder: (context, state) => TrackingScreen(
-            bookingId: state.uri.queryParameters['booking'],
-          ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppConstants.routeTrack,
+              builder: (context, state) => TrackingScreen(
+                bookingId: state.uri.queryParameters['booking'],
+              ),
+            ),
+          ],
         ),
-        GoRoute(
-          path: AppConstants.routePayments,
-          builder: (context, state) => const PaymentHistoryScreen(),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppConstants.routePayments,
+              builder: (context, state) => const PaymentHistoryScreen(),
+            ),
+          ],
         ),
-        GoRoute(
-          path: AppConstants.routeGarage,
-          builder: (context, state) => const VehicleGarageScreen(),
-        ),
-        GoRoute(
-          path: AppConstants.routeProfile,
-          builder: (context, state) => const ProfileScreen(),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppConstants.routeProfile,
+              builder: (context, state) => const ProfileScreen(),
+            ),
+            GoRoute(
+              path: AppConstants.routeGarage,
+              builder: (context, state) => const VehicleGarageScreen(),
+            ),
+          ],
         ),
       ],
     ),

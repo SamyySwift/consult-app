@@ -1,22 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/constants/app_constants.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/driver_colors.dart';
+import '../../../core/utils/motion.dart';
+import '../../../core/widgets/glass.dart';
 import '../../../core/widgets/location_required_banner.dart';
 import '../jobs/providers/job_provider.dart';
-import 'package:provider/provider.dart';
 
 class MainShell extends StatelessWidget {
-  final Widget child;
-  
-  const MainShell({super.key, required this.child});
+  final StatefulNavigationShell navigationShell;
+
+  const MainShell({super.key, required this.navigationShell});
 
   @override
   Widget build(BuildContext context) {
-    final int selectedIndex = _calculateSelectedIndex(context);
+    final shell = navigationShell;
 
     return Scaffold(
       backgroundColor: DriverColors.background,
+      // Tabs scroll under the floating glass nav; each adds bottom padding
+      // from MediaQuery so its last item clears it.
+      extendBody: true,
       body: Consumer<JobProvider>(
         builder: (context, jobs, _) => Column(
           children: [
@@ -26,118 +30,124 @@ class MainShell extends StatelessWidget {
               child: MediaQuery.removePadding(
                 context: context,
                 removeTop: jobs.locationBlocked,
-                child: child,
+                child: shell,
               ),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF0D0D0D),
-          border: Border(
-            top: BorderSide(
-              color: Color(0xFF1E1E1E),
-              width: 0.8,
-            ),
-          ),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _NavItem(
-                  icon: Icons.dashboard_outlined,
-                  activeIcon: Icons.dashboard_rounded,
-                  label: 'Dashboard',
-                  isSelected: selectedIndex == 0,
-                  onTap: () => context.go(AppRoutes.dashboard),
-                ),
-                _NavItem(
-                  icon: Icons.assignment_outlined,
-                  activeIcon: Icons.assignment_rounded,
-                  label: 'Jobs',
-                  isSelected: selectedIndex == 1,
-                  onTap: () => context.go(AppRoutes.jobBoard),
-                ),
-                _NavItem(
-                  icon: Icons.account_balance_wallet_outlined,
-                  activeIcon: Icons.account_balance_wallet_rounded,
-                  label: 'Earnings',
-                  isSelected: selectedIndex == 2,
-                  onTap: () => context.go(AppRoutes.earnings),
-                ),
-                _NavItem(
-                  icon: Icons.person_outline_rounded,
-                  activeIcon: Icons.person_rounded,
-                  label: 'Profile',
-                  isSelected: selectedIndex == 3,
-                  onTap: () => context.go(AppRoutes.profile),
-                ),
-              ],
-            ),
-          ),
-        ),
+      bottomNavigationBar: _GlassNavBar(
+        selectedIndex: shell.currentIndex,
+        // Re-tapping the current tab returns it to its root.
+        onSelect: (i) =>
+            shell.goBranch(i, initialLocation: i == shell.currentIndex),
       ),
     );
   }
-
-  static int _calculateSelectedIndex(BuildContext context) {
-    final String location = GoRouterState.of(context).uri.path;
-    if (location.startsWith(AppRoutes.dashboard)) return 0;
-    if (location.startsWith(AppRoutes.jobBoard)) return 1;
-    if (location.startsWith(AppRoutes.earnings)) return 2;
-    if (location.startsWith(AppRoutes.profile)) return 3;
-    return 0;
-  }
 }
 
-class _NavItem extends StatelessWidget {
+class _NavItem {
   final IconData icon;
-  final IconData activeIcon;
+  final IconData selectedIcon;
   final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
+  const _NavItem(this.icon, this.selectedIcon, this.label);
+}
 
-  const _NavItem({
-    required this.icon,
-    required this.activeIcon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
+/// Floating frosted-glass pill nav with a capsule that slides to the
+/// selected tab.
+class _GlassNavBar extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onSelect;
+
+  const _GlassNavBar({required this.selectedIndex, required this.onSelect});
+
+  static const _items = [
+    _NavItem(Icons.dashboard_outlined, Icons.dashboard_rounded, 'Dashboard'),
+    _NavItem(Icons.assignment_outlined, Icons.assignment_rounded, 'Jobs'),
+    _NavItem(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, 'Earnings'),
+    _NavItem(Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      splashColor: DriverColors.accent.withValues(alpha: 0.1),
-      highlightColor: Colors.transparent,
+    return SafeArea(
+      top: false,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSelected ? activeIcon : icon,
-              size: 22,
-              color: isSelected ? DriverColors.accent : const Color(0xFF666666),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? Colors.white : const Color(0xFF666666),
-                letterSpacing: 0.2,
-              ),
-            ),
-          ],
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+        child: GlassContainer(
+          radius: 36,
+          blur: true,
+          padding: const EdgeInsets.all(6),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final itemWidth = constraints.maxWidth / _items.length;
+              return SizedBox(
+                height: 60,
+                child: Stack(
+                  children: [
+                    AnimatedPositioned(
+                      duration: reduceMotion(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 320),
+                      curve: Curves.easeOutCubic,
+                      left: itemWidth * selectedIndex,
+                      top: 0,
+                      bottom: 0,
+                      width: itemWidth,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        for (var i = 0; i < _items.length; i++)
+                          SizedBox(
+                            width: itemWidth,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => onSelect(i),
+                              child: Semantics(
+                                button: true,
+                                selected: i == selectedIndex,
+                                label: _items[i].label,
+                                excludeSemantics: true,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      i == selectedIndex ? _items[i].selectedIcon : _items[i].icon,
+                                      size: 22,
+                                      color: i == selectedIndex
+                                          ? DriverColors.accent
+                                          : Colors.white.withValues(alpha: 0.6),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      _items[i].label,
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: i == selectedIndex
+                                            ? Colors.white
+                                            : Colors.white.withValues(alpha: 0.6),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

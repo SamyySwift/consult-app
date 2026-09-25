@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/motion.dart';
 import '../models/notification_model.dart';
 
 class InAppNotificationBanner {
@@ -88,6 +89,16 @@ class _InAppNotificationWidgetState extends State<_InAppNotificationWidget>
     ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
 
     _animController.forward();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reduce Motion: appear and disappear in place instead of sliding.
+    if (reduceMotion(context)) {
+      _animController.duration = Duration.zero;
+      _animController.value = 1;
+    }
   }
 
   void _dismissWithAnim() async {

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/driver_colors.dart';
+import 'glass.dart';
 
+/// The app's button. Primary buttons are the glowing glass pill, outlined
+/// ones a plain glass pill, and a custom [backgroundColor] (other than the
+/// accent) gives a solid pill in that colour.
 class DriverButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
@@ -32,72 +36,70 @@ class DriverButton extends StatelessWidget {
     this.foregroundColor,
   }) : isOutlined = true;
 
+  static const double _height = 58;
+
   @override
   Widget build(BuildContext context) {
-    if (isOutlined) {
-      return OutlinedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: foregroundColor ?? DriverColors.accent,
-          side: BorderSide(color: foregroundColor ?? DriverColors.accent, width: 1.5),
-          minimumSize: const Size(double.infinity, 52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        ),
-        child: _child(),
+    final solid = backgroundColor != null && backgroundColor != DriverColors.accent && !isOutlined;
+
+    if (!isOutlined && !solid) {
+      return GlowButton(
+        label: label,
+        onPressed: onPressed,
+        isLoading: isLoading,
+        icon: icon,
       );
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: backgroundColor == null
-            ? DriverColors.accentGradient
-            : null,
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: (backgroundColor ?? DriverColors.accent).withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          minimumSize: const Size(double.infinity, 52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    final fg = foregroundColor ?? (isOutlined ? DriverColors.accent : Colors.white);
+    final Widget pill = solid
+        ? DecoratedBox(
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: [
+                BoxShadow(color: backgroundColor!.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 6)),
+              ],
+            ),
+            child: SizedBox(height: _height, width: double.infinity, child: Center(child: _content(fg))),
+          )
+        : GlassContainer(
+            radius: 999,
+            tint: fg,
+            child: SizedBox(height: _height, width: double.infinity, child: Center(child: _content(fg))),
+          );
+
+    final enabled = onPressed != null && !isLoading;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      child: GestureDetector(
+        onTap: enabled ? onPressed : null,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 200),
+          opacity: onPressed == null && !isLoading ? 0.5 : 1,
+          child: pill,
         ),
-        child: _child(),
       ),
     );
   }
 
-  Widget _child() {
+  Widget _content(Color fg) {
     if (isLoading) {
       return SizedBox(
         width: 22,
         height: 22,
-        child: CircularProgressIndicator(color: foregroundColor ?? Colors.black, strokeWidth: 2.5),
+        child: CircularProgressIndicator(color: fg, strokeWidth: 2.5),
       );
     }
-    final textStyle = GoogleFonts.inter(
-      fontSize: 15,
-      fontWeight: FontWeight.w700,
-      color: foregroundColor ?? (isOutlined ? DriverColors.accent : Colors.black),
+    final text = Text(
+      label,
+      style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: fg),
     );
-    if (icon != null) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          icon!,
-          const SizedBox(width: 8),
-          Text(label, style: textStyle),
-        ],
-      );
-    }
-    return Text(label, style: textStyle);
+    if (icon == null) return text;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [icon!, const SizedBox(width: 8), text],
+    );
   }
 }

@@ -6,6 +6,13 @@ class AppConstants {
   // App Info
   static const String appName = 'Carpital Consult';
   static const String appTagline = 'Your vehicle, safely delivered.';
+  static const String appVersion = '1.0.0';
+
+  // Legal & support
+  // TODO: confirm these placeholder addresses before release.
+  static const String termsUrl = 'https://carpitalconsult.com/terms';
+  static const String privacyUrl = 'https://carpitalconsult.com/privacy';
+  static const String supportEmail = 'support@carpitalconsult.com';
 
   /// Car-carrier hero photo used behind the login and home screens.
   static const String heroImageUrl =

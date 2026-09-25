@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../booking/providers/booking_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/links.dart';
+import '../../../core/utils/motion.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/glass.dart';
+import '../../../core/widgets/surface.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -32,26 +34,25 @@ class ProfileScreen extends StatelessWidget {
                       padding: EdgeInsets.fromLTRB(24, 28, 24, 28),
                       child: Column(
                         children: [
-                          GlassContainer(
+                          Container(
                             width: 96,
                             height: 96,
-                            radius: 48,
-                            glow: true,
-                            tint: context.colors.accent,
-                            child: Center(
-                              child: Text(
-                                user?.initials ?? 'U',
-                                style: TextStyle(
-                                  color: context.colors.accentLight,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: context.colors.accent.withValues(
+                                alpha: 0.12,
                               ),
                             ),
-                          ).animate().scale(
-                            duration: 400.ms,
-                            curve: Curves.elasticOut,
-                          ),
+                            child: Text(
+                              user?.initials ?? 'U',
+                              style: TextStyle(
+                                color: context.colors.accentLight,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ).entrance(context, slide: 0),
 
                           SizedBox(height: 16),
 
@@ -63,7 +64,11 @@ class ProfileScreen extends StatelessWidget {
                               color: Colors.white,
                               letterSpacing: -0.4,
                             ),
-                          ).animate(delay: 100.ms).fadeIn(),
+                          ).entrance(
+                            context,
+                            delay: const Duration(milliseconds: 100),
+                            slide: 0,
+                          ),
 
                           SizedBox(height: 4),
 
@@ -73,7 +78,11 @@ class ProfileScreen extends StatelessWidget {
                               fontSize: 14,
                               color: Colors.white.withValues(alpha: 0.55),
                             ),
-                          ).animate(delay: 150.ms).fadeIn(),
+                          ).entrance(
+                            context,
+                            delay: const Duration(milliseconds: 150),
+                            slide: 0,
+                          ),
 
                           SizedBox(height: 2),
 
@@ -83,11 +92,15 @@ class ProfileScreen extends StatelessWidget {
                               fontSize: 14,
                               color: Colors.white.withValues(alpha: 0.55),
                             ),
-                          ).animate(delay: 200.ms).fadeIn(),
+                          ).entrance(
+                            context,
+                            delay: const Duration(milliseconds: 200),
+                            slide: 0,
+                          ),
 
                           SizedBox(height: 24),
 
-                          GlassContainer(
+                          SurfaceCard(
                             radius: 24,
                             padding: EdgeInsets.symmetric(vertical: 18),
                             child: Row(
@@ -117,7 +130,11 @@ class ProfileScreen extends StatelessWidget {
                                 ),
                               ],
                             ),
-                          ).animate(delay: 300.ms).fadeIn(duration: 400.ms),
+                          ).entrance(
+                            context,
+                            delay: const Duration(milliseconds: 300),
+                            slide: 0,
+                          ),
                         ],
                       ),
                     ),
@@ -141,16 +158,10 @@ class ProfileScreen extends StatelessWidget {
                               _MenuItem(
                                 Icons.notifications_outlined,
                                 'Notifications',
-                                'Manage notification preferences',
+                                'Updates about your bookings',
                                 onTap: () => context.push(
                                   AppConstants.routeNotifications,
                                 ),
-                              ),
-                              _MenuItem(
-                                Icons.security_rounded,
-                                'Security',
-                                'Password and security settings',
-                                onTap: () {},
                               ),
                             ],
                           ),
@@ -181,37 +192,27 @@ class ProfileScreen extends StatelessWidget {
                                 onTap: () =>
                                     context.push(AppConstants.routeGarage),
                               ),
-                              _MenuItem(
-                                Icons.upload_file_rounded,
-                                'My Documents',
-                                'Manage your uploaded documents',
-                                onTap: () {},
-                              ),
                             ],
                           ),
 
                           SizedBox(height: 22),
 
+                          // Security, My Documents, Help & FAQ and Rate the App
+                          // come back once they have somewhere to go.
                           _MenuSection(
                             title: 'Support',
                             items: [
                               _MenuItem(
-                                Icons.help_outline_rounded,
-                                'Help & FAQ',
-                                'Frequently asked questions',
-                                onTap: () {},
-                              ),
-                              _MenuItem(
                                 Icons.support_agent_rounded,
                                 'Contact Support',
-                                'Chat with our team',
-                                onTap: () {},
-                              ),
-                              _MenuItem(
-                                Icons.star_outline_rounded,
-                                'Rate the App',
-                                'Leave us a review',
-                                onTap: () {},
+                                'Email our team',
+                                onTap: () => openLink(
+                                  context,
+                                  Uri(
+                                    scheme: 'mailto',
+                                    path: AppConstants.supportEmail,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -225,19 +226,29 @@ class ProfileScreen extends StatelessWidget {
                                 Icons.description_outlined,
                                 'Terms of Service',
                                 '',
-                                onTap: () {},
+                                onTap: () => openLink(
+                                  context,
+                                  Uri.parse(AppConstants.termsUrl),
+                                ),
                               ),
                               _MenuItem(
                                 Icons.privacy_tip_outlined,
                                 'Privacy Policy',
                                 '',
-                                onTap: () {},
+                                onTap: () => openLink(
+                                  context,
+                                  Uri.parse(AppConstants.privacyUrl),
+                                ),
                               ),
                               _MenuItem(
                                 Icons.info_outline_rounded,
-                                'About Carpital Consult v1.0.0',
+                                'About ${AppConstants.appName}',
                                 '',
-                                onTap: () {},
+                                onTap: () => showAboutDialog(
+                                  context: context,
+                                  applicationName: AppConstants.appName,
+                                  applicationVersion: AppConstants.appVersion,
+                                ),
                               ),
                             ],
                           ),
@@ -279,7 +290,11 @@ class ProfileScreen extends StatelessWidget {
                             height: MediaQuery.paddingOf(context).bottom + 24,
                           ),
                         ],
-                      ).animate(delay: 200.ms).fadeIn(duration: 400.ms),
+                      ).entrance(
+                        context,
+                        delay: const Duration(milliseconds: 200),
+                        slide: 0,
+                      ),
                     ),
                   ),
                 ],
@@ -551,21 +566,17 @@ class _MenuSection extends StatelessWidget {
             ),
           ),
         ),
-        GlassContainer(
+        SurfaceCard(
           radius: 24,
           child: Column(
             children: [
               for (var i = 0; i < items.length; i++) ...[
                 ListTile(
-                  leading: GlassContainer(
-                    width: 36,
-                    height: 36,
+                  leading: IconTile(
+                    icon: items[i].icon,
+                    size: 36,
+                    iconSize: 18,
                     radius: 12,
-                    child: Icon(
-                      items[i].icon,
-                      size: 18,
-                      color: Colors.white.withValues(alpha: 0.85),
-                    ),
                   ),
                   title: Text(
                     items[i].title,

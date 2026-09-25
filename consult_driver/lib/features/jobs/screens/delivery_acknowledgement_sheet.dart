@@ -4,6 +4,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../../../core/theme/driver_colors.dart';
 import '../../../core/widgets/driver_button.dart';
+import '../../../core/widgets/glass.dart';
+import '../../../core/widgets/surface.dart';
+import '../../../core/widgets/tap_target.dart';
 
 class DeliveryAcknowledgementSheet extends StatefulWidget {
   final Future<void> Function(String signatureBase64) onConfirm;
@@ -11,13 +14,15 @@ class DeliveryAcknowledgementSheet extends StatefulWidget {
   const DeliveryAcknowledgementSheet({super.key, required this.onConfirm});
 
   @override
-  State<DeliveryAcknowledgementSheet> createState() => _DeliveryAcknowledgementSheetState();
+  State<DeliveryAcknowledgementSheet> createState() =>
+      _DeliveryAcknowledgementSheetState();
 }
 
-class _DeliveryAcknowledgementSheetState extends State<DeliveryAcknowledgementSheet> {
+class _DeliveryAcknowledgementSheetState
+    extends State<DeliveryAcknowledgementSheet> {
   bool _goodCondition = false;
   bool _inspected = false;
-  
+
   final List<Offset?> _points = [];
   bool _isSubmitting = false;
 
@@ -91,150 +96,227 @@ class _DeliveryAcknowledgementSheetState extends State<DeliveryAcknowledgementSh
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF111111),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    return GlassBottomSheet(
+      padding: EdgeInsets.fromLTRB(
+        22,
+        12,
+        22,
+        MediaQuery.of(context).viewInsets.bottom + 22,
       ),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        left: 20,
-        right: 20,
-        top: 20,
-      ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF333333),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Proof of Handover',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Complete physical vehicle check and obtain recipient signature.',
-                style: TextStyle(fontSize: 13, color: Color(0xFF888888)),
-              ),
-              const SizedBox(height: 20),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const GlassSheetHeader(
+              icon: Icons.handshake_rounded,
+              title: 'Proof of Handover',
+              subtitle:
+                  'Complete physical vehicle check and obtain recipient signature.',
+            ),
+            const SizedBox(height: 22),
 
-              // Checkbox 1
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF181818),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _goodCondition ? DriverColors.accent.withValues(alpha: 0.5) : const Color(0xFF262626),
-                  ),
-                ),
-                child: CheckboxListTile(
-                  value: _goodCondition,
-                  onChanged: (v) => setState(() => _goodCondition = v ?? false),
-                  title: const Text(
-                    'Vehicle in pristine condition',
-                    style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: const Text(
-                    'No new scratches, dents, or interior damage verified.',
-                    style: TextStyle(color: Color(0xFF888888), fontSize: 12),
-                  ),
-                  activeColor: DriverColors.accent,
-                  checkColor: Colors.black,
-                  controlAffinity: ListTileControlAffinity.leading,
-                ),
-              ),
-              const SizedBox(height: 10),
+            _CheckTile(
+              checked: _goodCondition,
+              title: 'Vehicle in pristine condition',
+              subtitle: 'No new scratches, dents, or interior damage verified.',
+              onChanged: (v) => setState(() => _goodCondition = v),
+            ),
+            const SizedBox(height: 10),
+            _CheckTile(
+              checked: _inspected,
+              title: 'Keys and documents handed over',
+              subtitle:
+                  'Recipient has received key fobs and inspection paperwork.',
+              onChanged: (v) => setState(() => _inspected = v),
+            ),
+            const SizedBox(height: 22),
 
-              // Checkbox 2
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF181818),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _inspected ? DriverColors.accent.withValues(alpha: 0.5) : const Color(0xFF262626),
-                  ),
-                ),
-                child: CheckboxListTile(
-                  value: _inspected,
-                  onChanged: (v) => setState(() => _inspected = v ?? false),
-                  title: const Text(
-                    'Keys and documents handed over',
-                    style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: const Text(
-                    'Recipient has received key fobs and inspection paperwork.',
-                    style: TextStyle(color: Color(0xFF888888), fontSize: 12),
-                  ),
-                  activeColor: DriverColors.accent,
-                  checkColor: Colors.black,
-                  controlAffinity: ListTileControlAffinity.leading,
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Signature Pad
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
+            // Signature Pad
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
                     'Recipient Signature',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
-                  TextButton(
-                    onPressed: _clearSignature,
-                    child: const Text('Clear', style: TextStyle(color: Color(0xFF888888))),
+                ),
+                TapTarget(
+                  onTap: _clearSignature,
+                  child: GlassPill(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    child: Text(
+                      'Clear',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              height: 150,
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: _points.isEmpty
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : DriverColors.accent.withValues(alpha: 0.5),
+                ),
+                borderRadius: BorderRadius.circular(22),
+                color: const Color(0xFF141414),
               ),
-              const SizedBox(height: 8),
-              Container(
-                height: 140,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: Stack(
+                  children: [
+                    if (_points.isEmpty)
+                      Center(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.draw_rounded,
+                              color: Colors.white.withValues(alpha: 0.3),
+                              size: 18,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Sign here',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.3),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onPanUpdate: (details) {
+                          setState(() {
+                            _points.add(details.localPosition);
+                          });
+                        },
+                        onPanEnd: (details) {
+                          setState(() {
+                            _points.add(null);
+                          });
+                        },
+                        child: CustomPaint(
+                          painter: SignaturePainter(_points),
+                          size: Size.infinite,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            _isSubmitting
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: DriverColors.accent,
+                    ),
+                  )
+                : DriverButton(
+                    label: 'Confirm & Complete Handover',
+                    backgroundColor: DriverColors.accent,
+                    foregroundColor: Colors.black,
+                    onPressed: _submit,
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Glass row with a rounded check box, lit green once ticked.
+class _CheckTile extends StatelessWidget {
+  final bool checked;
+  final String title;
+  final String subtitle;
+  final ValueChanged<bool> onChanged;
+
+  const _CheckTile({
+    required this.checked,
+    required this.title,
+    required this.subtitle,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      checked: checked,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onChanged(!checked),
+        // Checked rows get a green hairline instead of a glow.
+        child: SurfaceCard(
+          radius: 22,
+          borderColor: checked
+              ? DriverColors.accent.withValues(alpha: 0.6)
+              : null,
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 26,
+                height: 26,
                 decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFF2C2C2E)),
-                  borderRadius: BorderRadius.circular(16),
-                  color: const Color(0xFF141414),
+                  gradient: checked ? DriverColors.accentGradient : null,
+                  color: checked ? null : Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(9),
+                  border: checked
+                      ? null
+                      : Border.all(color: Colors.white.withValues(alpha: 0.2)),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: GestureDetector(
-                    onPanUpdate: (details) {
-                      setState(() {
-                        _points.add(details.localPosition);
-                      });
-                    },
-                    onPanEnd: (details) {
-                      setState(() {
-                        _points.add(null);
-                      });
-                    },
-                    child: CustomPaint(
-                      painter: SignaturePainter(_points),
-                      size: Size.infinite,
+                child: checked
+                    ? const Icon(
+                        Icons.check_rounded,
+                        size: 18,
+                        color: Colors.black,
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 24),
-              _isSubmitting
-                  ? const Center(child: CircularProgressIndicator(color: DriverColors.accent))
-                  : DriverButton(
-                      label: 'Confirm & Complete Handover',
-                      backgroundColor: DriverColors.accent,
-                      foregroundColor: Colors.black,
-                      onPressed: _submit,
-                    ),
             ],
           ),
         ),

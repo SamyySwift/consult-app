@@ -92,6 +92,9 @@ class BookingProvider extends ChangeNotifier {
 
         TrackingSocket.instance
             .subscribeTo(activeBookings.map((b) => b.id));
+      } else if (!silent) {
+        // Screens show their own wording; this is for logs and checks.
+        _errorMessage = 'Failed to load bookings';
       }
     } catch (e) {
       debugPrint('Error fetching bookings from API: $e');

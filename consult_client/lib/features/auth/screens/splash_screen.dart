@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/utils/motion.dart';
 import '../providers/auth_provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
@@ -74,7 +75,7 @@ class _SplashScreenState extends State<SplashScreen>
                       fit: BoxFit.contain,
                     ),
                   )
-                  .animate()
+                  .motionAware(context)
                   .scale(
                     duration: 600.ms,
                     curve: Curves.elasticOut,
@@ -94,7 +95,7 @@ class _SplashScreenState extends State<SplashScreen>
                       letterSpacing: -0.5,
                     ),
                   )
-                  .animate(delay: 300.ms)
+                  .motionAware(context, delay: 300.ms)
                   .fadeIn(duration: 500.ms)
                   .slideY(begin: 0.3, curve: Curves.easeOut),
 
@@ -108,7 +109,7 @@ class _SplashScreenState extends State<SplashScreen>
                       fontWeight: FontWeight.w400,
                     ),
                   )
-                  .animate(delay: 500.ms)
+                  .motionAware(context, delay: 500.ms)
                   .fadeIn(duration: 500.ms)
                   .slideY(begin: 0.3, curve: Curves.easeOut),
 
@@ -122,7 +123,7 @@ class _SplashScreenState extends State<SplashScreen>
                   strokeWidth: 2.5,
                   color: Colors.white.withValues(alpha: 0.5),
                 ),
-              ).animate(delay: 800.ms).fadeIn(duration: 400.ms),
+              ).motionAware(context, delay: 800.ms).fadeIn(duration: 400.ms),
             ],
           ),
         ),

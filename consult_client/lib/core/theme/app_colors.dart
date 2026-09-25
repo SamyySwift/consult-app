@@ -187,7 +187,7 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     surfaceVariant: Color(0xFF1E1E1E), // Slightly lighter for inputs / variants
     textPrimary: Color(0xFFFFFFFF),
     textSecondary: Color(0xFF9E9E9E),
-    textLight: Color(0xFF616161),
+    textLight: Color(0xFF8A8A8A), // 6.1:1 on black; #616161 was 3.4:1
     textOnDark: Color(0xFFFFFFFF),
     success: Color(0xFF00C853), // Green = success too
     successLight: Color(0xFF1A3A2A), // Dark green tint for backgrounds

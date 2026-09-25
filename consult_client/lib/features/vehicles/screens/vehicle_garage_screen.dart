@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 
 import '../../booking/providers/booking_provider.dart';
@@ -9,8 +8,10 @@ import '../models/vehicle_document_model.dart';
 import '../widgets/order_request_document_view.dart';
 import '../widgets/proof_of_handover_document_view.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/motion.dart';
 import '../../../core/widgets/glass.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/surface.dart';
 
 class VehicleGarageScreen extends StatelessWidget {
   const VehicleGarageScreen({super.key});
@@ -85,7 +86,7 @@ class _VehicleRecordCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: GlassContainer(
+      child: SurfaceCard(
         radius: 28,
         padding: const EdgeInsets.all(18),
         child: Column(
@@ -94,16 +95,11 @@ class _VehicleRecordCard extends StatelessWidget {
             // Header
             Row(
               children: [
-                GlassContainer(
-                  width: 50,
-                  height: 50,
+                IconTile(
+                  icon: record.iconData,
+                  size: 50,
+                  iconSize: 24,
                   radius: 17,
-                  tint: context.colors.accent,
-                  child: Icon(
-                    record.iconData,
-                    color: context.colors.accentLight,
-                    size: 24,
-                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -130,28 +126,14 @@ class _VehicleRecordCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.white.withValues(alpha: 0.45),
+                                color: Colors.white.withValues(alpha: 0.55),
                                 fontFamily: 'monospace',
                               ),
                             ),
                           ),
                           if (record.isCurrentlyInTransit) ...[
                             const SizedBox(width: 8),
-                            GlassPill(
-                              tint: context.colors.accent,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              child: Text(
-                                'IN TRANSIT',
-                                style: TextStyle(
-                                  color: context.colors.accentLight,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
+                            const FlatChip(label: 'IN TRANSIT', accent: true),
                           ],
                         ],
                       ),
@@ -183,7 +165,7 @@ class _VehicleRecordCard extends StatelessWidget {
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.2,
-                color: Colors.white.withValues(alpha: 0.45),
+                color: Colors.white.withValues(alpha: 0.55),
               ),
             ),
             const SizedBox(height: 12),
@@ -270,7 +252,12 @@ class _VehicleRecordCard extends StatelessWidget {
           ],
         ),
       ),
-    ).animate(delay: Duration(milliseconds: index * 50)).fadeIn().slideY(begin: 0.05);
+    ).entrance(
+      context,
+      delay: Duration(milliseconds: index * 50),
+      duration: const Duration(milliseconds: 300),
+      slide: 0.05,
+    );
   }
 }
 
@@ -330,9 +317,13 @@ class _InfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A tile inside a card: a slightly lighter fill, no border of its own.
     return Expanded(
-      child: GlassContainer(
-        radius: 16,
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.colors.surfaceVariant,
+          borderRadius: BorderRadius.circular(16),
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

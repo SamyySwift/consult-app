@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/utils/motion.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -198,7 +199,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           _buildSectionHeader('TODAY'),
           ...todayList.asMap().entries.map(
             (entry) => NotificationItemCard(notification: entry.value)
-                .animate()
+                .motionAware(context)
                 .fadeIn(
                   duration: 300.ms,
                   delay: Duration(milliseconds: entry.key * 40),
@@ -211,7 +212,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           _buildSectionHeader('YESTERDAY'),
           ...yesterdayList.asMap().entries.map(
             (entry) => NotificationItemCard(notification: entry.value)
-                .animate()
+                .motionAware(context)
                 .fadeIn(
                   duration: 300.ms,
                   delay: Duration(milliseconds: entry.key * 40),
@@ -224,7 +225,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           _buildSectionHeader('EARLIER'),
           ...earlierList.asMap().entries.map(
             (entry) => NotificationItemCard(notification: entry.value)
-                .animate()
+                .motionAware(context)
                 .fadeIn(
                   duration: 300.ms,
                   delay: Duration(milliseconds: entry.key * 40),
@@ -262,7 +263,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           subtitle: _selectedFilter == NotificationFilter.unread
               ? "You're all caught up! There are no unread notifications."
               : 'You will receive real-time updates for every milestone of your vehicle shipment here.',
-        ).animate().fadeIn(duration: 400.ms),
+        ).motionAware(context).fadeIn(duration: 400.ms),
       ),
     );
   }

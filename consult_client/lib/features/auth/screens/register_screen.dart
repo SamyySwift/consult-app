@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/utils/motion.dart';
 import '../providers/auth_provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/widgets/tap_target.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/glass.dart';
@@ -103,7 +105,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ],
                   ),
                   textAlign: TextAlign.center,
-                ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
+                ).motionAware(context).fadeIn(duration: 400.ms).slideY(begin: 0.1),
 
                 SizedBox(height: 8),
 
@@ -116,7 +118,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         height: 1.5,
                       ),
                     )
-                    .animate(delay: 100.ms)
+                    .motionAware(context, delay: 100.ms)
                     .fadeIn(duration: 400.ms)
                     .slideY(begin: 0.1),
 
@@ -131,7 +133,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       borderRadius: _pillRadius,
                       prefixIcon: Icon(Icons.person_outline_rounded),
                     )
-                    .animate(delay: 150.ms)
+                    .motionAware(context, delay: 150.ms)
                     .fadeIn(duration: 400.ms)
                     .slideY(begin: 0.1),
 
@@ -147,7 +149,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       borderRadius: _pillRadius,
                       prefixIcon: Icon(Icons.mail_outline_rounded),
                     )
-                    .animate(delay: 200.ms)
+                    .motionAware(context, delay: 200.ms)
                     .fadeIn(duration: 400.ms)
                     .slideY(begin: 0.1),
 
@@ -174,7 +176,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             setState(() => _obscurePass = !_obscurePass),
                       ),
                     )
-                    .animate(delay: 250.ms)
+                    .motionAware(context, delay: 250.ms)
                     .fadeIn(duration: 400.ms)
                     .slideY(begin: 0.1),
 
@@ -249,7 +251,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ],
                     ),
                   ),
-                ).animate(delay: 300.ms).fadeIn(duration: 400.ms),
+                ).motionAware(context, delay: 300.ms).fadeIn(duration: 400.ms),
 
                 SizedBox(height: 24),
 
@@ -258,7 +260,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       isLoading: auth.isLoading,
                       onPressed: auth.isLoading ? null : _submit,
                     )
-                    .animate(delay: 350.ms)
+                    .motionAware(context, delay: 350.ms)
                     .fadeIn(duration: 400.ms)
                     .slideY(begin: 0.1),
 
@@ -286,7 +288,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                   ],
-                ).animate(delay: 400.ms).fadeIn(duration: 400.ms),
+                ).motionAware(context, delay: 400.ms).fadeIn(duration: 400.ms),
 
                 SizedBox(height: 20),
 
@@ -310,7 +312,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       child: GoogleLogo(size: 24),
                     ),
                   ],
-                ).animate(delay: 450.ms).fadeIn(duration: 400.ms),
+                ).motionAware(context, delay: 450.ms).fadeIn(duration: 400.ms),
 
                 SizedBox(height: 28),
 
@@ -324,7 +326,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         fontSize: 14,
                       ),
                     ),
-                    GestureDetector(
+                    TapTarget(
                       onTap: () => context.go(AppConstants.routeLogin),
                       child: Text(
                         'Sign in',
@@ -336,7 +338,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                   ],
-                ).animate(delay: 500.ms).fadeIn(duration: 400.ms),
+                ).motionAware(context, delay: 500.ms).fadeIn(duration: 400.ms),
               ],
             ),
           ),

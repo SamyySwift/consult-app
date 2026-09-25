@@ -1,30 +1,27 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import '../booking/providers/booking_provider.dart';
 import '../booking/models/booking_model.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/widgets/glass.dart';
+import '../../../core/widgets/surface.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/tap_target.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/links.dart';
+import '../../../core/utils/motion.dart';
 import '../auth/providers/auth_provider.dart';
 import '../notifications/providers/notification_provider.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  static const _pendingStatuses = {
-    BookingStatusEnum.pending,
-    BookingStatusEnum.confirmed,
-  };
-  static const _inTransitStatuses = {
-    BookingStatusEnum.pickedUp,
-    BookingStatusEnum.inTransit,
-    BookingStatusEnum.outForDelivery,
-  };
+  /// Active shipments listed on the landing page before "See All".
+  static const _maxShipmentsShown = 3;
 
   @override
   Widget build(BuildContext context) {
@@ -33,212 +30,265 @@ class HomeScreen extends StatelessWidget {
         final user = auth.user;
         final active = bookingProv.activeBookings;
         final bookings = bookingProv.bookings;
-        int countOf(Set<BookingStatusEnum> statuses) =>
-            bookings.where((b) => statuses.contains(b.status)).length;
+        int countWhere(bool Function(BookingStatusEnum) test) =>
+            bookings.where((b) => test(b.status)).length;
 
         void track(BookingModel b) =>
             context.go('${AppConstants.routeTrack}?booking=${b.id}');
+
+        // Nothing to show yet: say so, rather than "No Active Shipments".
+        final Widget shipmentSlot;
+        if (bookings.isEmpty && bookingProv.isLoading) {
+          shipmentSlot = const _ShipmentSkeleton();
+        } else if (bookings.isEmpty && bookingProv.errorMessage != null) {
+          shipmentSlot = GlassEmptyState(
+            icon: Icons.cloud_off_rounded,
+            title: 'Couldn\'t Load Bookings',
+            subtitle: 'Check your connection and try again.',
+            action: GlassPillButton(
+              icon: Icons.refresh_rounded,
+              label: 'Try Again',
+              onTap: bookingProv.fetchBookings,
+            ),
+          );
+        } else if (active.isEmpty) {
+          shipmentSlot = _EmptyShipmentCard(
+            onBook: () => context.push(AppConstants.routeBookingNew),
+          );
+        } else {
+          shipmentSlot = _FeaturedShipmentCard(
+            booking: active.first,
+            onTrack: () => track(active.first),
+          );
+        }
 
         return Scaffold(
           backgroundColor: context.colors.background,
           body: Stack(
             children: [
               const Positioned.fill(child: _HeroBackdrop()),
-              CustomScrollView(
-                slivers: [
-                  // ── Header ─────────────────────────────────────────────
-                  SliverToBoxAdapter(
-                    child: SafeArea(
-                      bottom: false,
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(24, 16, 24, 0),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Good ${_greeting()} 👋',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.white.withValues(
-                                        alpha: 0.7,
+              RefreshIndicator.adaptive(
+                onRefresh: bookingProv.fetchBookings,
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    // ── Header ─────────────────────────────────────────────
+                    SliverToBoxAdapter(
+                      child: SafeArea(
+                        bottom: false,
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(24, 16, 24, 0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Good ${_greeting()} 👋',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.white.withValues(
+                                          alpha: 0.7,
+                                        ),
+                                        letterSpacing: 0.2,
                                       ),
-                                      letterSpacing: 0.2,
                                     ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    user?.firstName ?? 'User',
-                                    style: TextStyle(
-                                      fontSize: 30,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
-                                      letterSpacing: -0.6,
+                                    SizedBox(height: 4),
+                                    Text(
+                                      user?.firstName ?? 'User',
+                                      style: TextStyle(
+                                        fontSize: 30,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                        letterSpacing: -0.6,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                            const _NotificationButton(),
-                            SizedBox(width: 10),
-                            _Avatar(user: user),
-                          ],
+                              const _NotificationButton(),
+                              SizedBox(width: 10),
+                              _Avatar(user: user),
+                            ],
+                          ),
                         ),
-                      ),
-                    ).animate().fadeIn(duration: 400.ms),
-                  ),
-
-                  // ── Hero metric ────────────────────────────────────────
-                  SliverToBoxAdapter(
-                    child:
-                        Padding(
-                              padding: EdgeInsets.fromLTRB(24, 56, 24, 0),
-                              child: BracketedStats(
-                                label: 'Active Shipments',
-                                value: '${active.length}',
-                                pills: [
-                                  _statusPill(
-                                    Icons.hourglass_bottom_rounded,
-                                    'Pending',
-                                    countOf(_pendingStatuses),
-                                    bookings.length,
-                                  ),
-                                  _statusPill(
-                                    Icons.local_shipping_rounded,
-                                    'In Transit',
-                                    countOf(_inTransitStatuses),
-                                    bookings.length,
-                                  ),
-                                  _statusPill(
-                                    Icons.check_circle_rounded,
-                                    'Delivered',
-                                    countOf({BookingStatusEnum.delivered}),
-                                    bookings.length,
-                                  ),
-                                ],
-                              ),
-                            )
-                            .animate(delay: 100.ms)
-                            .fadeIn(duration: 500.ms)
-                            .slideY(begin: 0.08),
-                  ),
-
-                  // ── Active shipments ───────────────────────────────────
-                  SliverToBoxAdapter(
-                    child: _SectionHeader(
-                      title: 'Active Shipments',
-                      padding: EdgeInsets.fromLTRB(24, 40, 24, 14),
-                      onSeeAll: active.isEmpty
-                          ? null
-                          : () => context.go(AppConstants.routeBookings),
+                      ).entrance(context, slide: 0),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child:
-                        Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 24),
-                              child: active.isEmpty
-                                  ? _EmptyShipmentCard(
-                                      onBook: () => context.push(
-                                        AppConstants.routeBookingNew,
-                                      ),
-                                    )
-                                  : _FeaturedShipmentCard(
-                                      booking: active.first,
-                                      onTrack: () => track(active.first),
-                                    ),
-                            )
-                            .animate(delay: 200.ms)
-                            .fadeIn(duration: 500.ms)
-                            .slideY(begin: 0.08),
-                  ),
-                  if (active.length > 1)
-                    SliverPadding(
-                      padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate((context, i) {
-                          final booking = active[i + 1];
-                          return Padding(
+
+                    // ── Hero metric ────────────────────────────────────────
+                    SliverToBoxAdapter(
+                      child:
+                          Padding(
+                            padding: EdgeInsets.fromLTRB(24, 56, 24, 0),
+                            child: BracketedStats(
+                              label: 'Active Shipments',
+                              value: '${active.length}',
+                              pills: [
+                                _statusPill(
+                                  Icons.hourglass_bottom_rounded,
+                                  'Pending',
+                                  countWhere(
+                                    (s) =>
+                                        s == BookingStatusEnum.pending ||
+                                        s == BookingStatusEnum.confirmed,
+                                  ),
+                                  bookings.length,
+                                ),
+                                _statusPill(
+                                  Icons.local_shipping_rounded,
+                                  'In Transit',
+                                  countWhere((s) => s.isTrackable),
+                                  bookings.length,
+                                ),
+                                _statusPill(
+                                  Icons.check_circle_rounded,
+                                  'Delivered',
+                                  countWhere(
+                                    (s) => s == BookingStatusEnum.delivered,
+                                  ),
+                                  bookings.length,
+                                ),
+                              ],
+                            ),
+                          ).entrance(
+                            context,
+                            delay: const Duration(milliseconds: 100),
+                            duration: const Duration(milliseconds: 500),
+                          ),
+                    ),
+
+                    // ── Active shipments ───────────────────────────────────
+                    SliverToBoxAdapter(
+                      child: _SectionHeader(
+                        title: 'Active Shipments',
+                        padding: EdgeInsets.fromLTRB(24, 40, 24, 14),
+                        onSeeAll: active.isEmpty
+                            ? null
+                            : () => context.go(
+                                '${AppConstants.routeBookings}?tab=active',
+                              ),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child:
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 24),
+                            child: shipmentSlot,
+                          ).entrance(
+                            context,
+                            delay: const Duration(milliseconds: 200),
+                            duration: const Duration(milliseconds: 500),
+                          ),
+                    ),
+                    // The featured card plus up to two rows; See All has the rest.
+                    if (active.length > 1)
+                      SliverPadding(
+                        padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, i) {
+                              final booking = active[i + 1];
+                              return Padding(
                                 padding: EdgeInsets.only(bottom: 10),
                                 child: _ShipmentRow(
                                   booking: booking,
                                   onTap: () => track(booking),
                                 ),
-                              )
-                              .animate(
+                              ).entrance(
+                                context,
                                 delay: Duration(milliseconds: 250 + i * 80),
-                              )
-                              .fadeIn(duration: 400.ms)
-                              .slideY(begin: 0.08);
-                        }, childCount: active.length - 1),
+                              );
+                            },
+                            childCount:
+                                math.min(active.length, _maxShipmentsShown) - 1,
+                          ),
+                        ),
+                      ),
+
+                    // ── Quick actions ──────────────────────────────────────
+                    SliverToBoxAdapter(
+                      child: _SectionHeader(
+                        title: 'Quick Actions',
+                        padding: EdgeInsets.fromLTRB(24, 30, 24, 14),
                       ),
                     ),
-
-                  // ── Quick actions ──────────────────────────────────────
-                  SliverToBoxAdapter(
-                    child: _SectionHeader(
-                      title: 'Quick Actions',
-                      padding: EdgeInsets.fromLTRB(24, 30, 24, 14),
+                    SliverToBoxAdapter(
+                      child:
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 24),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _QuickAction(
+                                  icon: Icons.add_circle_rounded,
+                                  label: 'New\nBooking',
+                                  onTap: () => context.push(
+                                    AppConstants.routeBookingNew,
+                                  ),
+                                ),
+                                SizedBox(width: 12),
+                                _QuickAction(
+                                  icon: Icons.my_location_rounded,
+                                  label: 'Track\nVehicle',
+                                  onTap: () =>
+                                      context.go(AppConstants.routeTrack),
+                                ),
+                                SizedBox(width: 12),
+                                _QuickAction(
+                                  icon: Icons.credit_card_rounded,
+                                  label: 'Payment\nHistory',
+                                  onTap: () =>
+                                      context.go(AppConstants.routePayments),
+                                ),
+                                SizedBox(width: 12),
+                                _QuickAction(
+                                  icon: Icons.support_agent_rounded,
+                                  label: 'Support',
+                                  onTap: () => openLink(
+                                    context,
+                                    Uri(
+                                      scheme: 'mailto',
+                                      path: AppConstants.supportEmail,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ).entrance(
+                            context,
+                            delay: const Duration(milliseconds: 300),
+                            slide: 0,
+                          ),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _QuickAction(
-                            icon: Icons.add_circle_rounded,
-                            label: 'New\nBooking',
-                            onTap: () =>
-                                context.push(AppConstants.routeBookingNew),
-                          ),
-                          SizedBox(width: 12),
-                          _QuickAction(
-                            icon: Icons.my_location_rounded,
-                            label: 'Track\nVehicle',
-                            onTap: () => context.go(AppConstants.routeTrack),
-                          ),
-                          SizedBox(width: 12),
-                          _QuickAction(
-                            icon: Icons.credit_card_rounded,
-                            label: 'Payment\nHistory',
-                            onTap: () => context.go(AppConstants.routePayments),
-                          ),
-                          SizedBox(width: 12),
-                          _QuickAction(
-                            icon: Icons.support_agent_rounded,
-                            label: 'Support',
-                            onTap: () {},
-                          ),
-                        ],
+
+                    // ── For you ────────────────────────────────────────────
+                    SliverToBoxAdapter(
+                      child: _SectionHeader(
+                        title: 'For You',
+                        padding: EdgeInsets.fromLTRB(24, 30, 24, 14),
                       ),
-                    ).animate(delay: 300.ms).fadeIn(duration: 400.ms),
-                  ),
-
-                  // ── For you ────────────────────────────────────────────
-                  SliverToBoxAdapter(
-                    child: _SectionHeader(
-                      title: 'For You',
-                      padding: EdgeInsets.fromLTRB(24, 30, 24, 14),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24),
-                      child: _PromoBanner(),
-                    ).animate(delay: 400.ms).fadeIn(duration: 400.ms),
-                  ),
-
-                  // Clear the floating nav bar.
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: MediaQuery.paddingOf(context).bottom + 24,
+                    SliverToBoxAdapter(
+                      child:
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 24),
+                            child: _PromoBanner(),
+                          ).entrance(
+                            context,
+                            delay: const Duration(milliseconds: 400),
+                            slide: 0,
+                          ),
                     ),
-                  ),
-                ],
+
+                    // Clear the floating nav bar.
+                    SliverToBoxAdapter(
+                      child: SizedBox(
+                        height: MediaQuery.paddingOf(context).bottom + 24,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -363,22 +413,26 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.go(AppConstants.routeProfile),
-      child: GlassContainer(
-        width: 46,
-        height: 46,
-        radius: 23,
-        blur: true,
-        glow: true,
-        tint: context.colors.accent,
-        child: Center(
-          child: Text(
-            user?.initials ?? 'U',
-            style: TextStyle(
-              color: context.colors.accentLight,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
+    // Neutral glass, matching the bell beside it; green is kept for status.
+    return Semantics(
+      button: true,
+      label: 'Profile',
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: () => context.go(AppConstants.routeProfile),
+        child: GlassContainer(
+          width: 46,
+          height: 46,
+          radius: 23,
+          blur: true,
+          child: Center(
+            child: Text(
+              user?.initials ?? 'U',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
@@ -416,7 +470,7 @@ class _SectionHeader extends StatelessWidget {
             ),
           ),
           if (onSeeAll != null)
-            GestureDetector(
+            TapTarget(
               onTap: onSeeAll,
               child: Text(
                 'See All',
@@ -501,23 +555,19 @@ class _FeaturedShipmentCard extends StatelessWidget {
                       'Booking #${shortRef(booking.id)}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.4),
+                        color: Colors.white.withValues(alpha: 0.55),
                       ),
                     ),
                   ],
                 ),
               ),
               SizedBox(width: 14),
-              GlassContainer(
-                width: 72,
-                height: 84,
+              IconTile(
+                icon: Icons.directions_car_rounded,
+                size: 72,
+                iconSize: 34,
                 radius: 20,
-                tint: context.colors.accent,
-                child: Icon(
-                  Icons.directions_car_rounded,
-                  size: 34,
-                  color: context.colors.accentLight,
-                ),
+                accent: true,
               ),
             ],
           ),
@@ -528,6 +578,51 @@ class _FeaturedShipmentCard extends StatelessWidget {
             onTap: onTrack,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Placeholder in the shipment slot while bookings load.
+class _ShipmentSkeleton extends StatelessWidget {
+  const _ShipmentSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(double width, double height) => Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: context.colors.surfaceVariant,
+        borderRadius: BorderRadius.circular(6),
+      ),
+    );
+
+    return Semantics(
+      label: 'Loading bookings',
+      child: SurfaceCard(
+        radius: 30,
+        padding: EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  bar(90, 20),
+                  SizedBox(height: 14),
+                  bar(180, 20),
+                  SizedBox(height: 10),
+                  bar(double.infinity, 14),
+                  SizedBox(height: 6),
+                  bar(120, 14),
+                ],
+              ),
+            ),
+            SizedBox(width: 14),
+            bar(72, 84),
+          ],
+        ),
       ),
     );
   }
@@ -548,16 +643,12 @@ class _EmptyShipmentCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              GlassContainer(
-                width: 56,
-                height: 56,
+              IconTile(
+                icon: Icons.local_shipping_outlined,
+                size: 56,
+                iconSize: 28,
                 radius: 18,
-                tint: context.colors.accent,
-                child: Icon(
-                  Icons.local_shipping_outlined,
-                  size: 28,
-                  color: context.colors.accentLight,
-                ),
+                accent: true,
               ),
               SizedBox(width: 14),
               Expanded(
@@ -606,61 +697,49 @@ class _ShipmentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return SurfaceCard(
       onTap: onTap,
-      child: GlassContainer(
-        radius: 22,
-        padding: EdgeInsets.all(14),
-        child: Row(
-          children: [
-            GlassContainer(
-              width: 42,
-              height: 42,
-              radius: 14,
-              tint: context.colors.accent,
-              child: Icon(
-                Icons.directions_car_rounded,
-                size: 20,
-                color: context.colors.accentLight,
-              ),
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    booking.vehicle.displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
+      radius: 22,
+      padding: EdgeInsets.all(14),
+      child: Row(
+        children: [
+          IconTile(icon: Icons.directions_car_rounded, size: 42),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  booking.vehicle.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
                   ),
-                  SizedBox(height: 2),
-                  Text(
-                    '${booking.pickup.address} → ${booking.dropoff.address}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white.withValues(alpha: 0.55),
-                    ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  '${booking.pickup.address} → ${booking.dropoff.address}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.55),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            SizedBox(width: 8),
-            StatusBadge(status: booking.status, compact: true),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 20,
-              color: Colors.white.withValues(alpha: 0.4),
-            ),
-          ],
-        ),
+          ),
+          SizedBox(width: 8),
+          StatusBadge(status: booking.status, compact: true),
+          Icon(
+            Icons.chevron_right_rounded,
+            size: 20,
+            color: Colors.white.withValues(alpha: 0.4),
+          ),
+        ],
       ),
     );
   }
@@ -681,32 +760,41 @@ class _QuickAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          children: [
-            AspectRatio(
-              aspectRatio: 1,
-              child: GlassContainer(
-                radius: 24,
-                child: Center(
-                  child: Icon(icon, color: context.colors.accent, size: 28),
+      child: Semantics(
+        button: true,
+        label: label.replaceAll('\n', ' '),
+        excludeSemantics: true,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Column(
+            children: [
+              AspectRatio(
+                aspectRatio: 1,
+                child: SurfaceCard(
+                  radius: 24,
+                  child: Center(
+                    child: Icon(
+                      icon,
+                      color: Colors.white.withValues(alpha: 0.9),
+                      size: 28,
+                    ),
+                  ),
                 ),
               ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Colors.white.withValues(alpha: 0.75),
-                height: 1.3,
+              SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.75),
+                  height: 1.3,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -717,7 +805,7 @@ class _QuickAction extends StatelessWidget {
 class _PromoBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return GlassContainer(
+    return SurfaceCard(
       radius: 28,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
@@ -749,22 +837,7 @@ class _PromoBanner extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    GlassPill(
-                      tint: context.colors.accent,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      child: Text(
-                        'LIMITED OFFER',
-                        style: TextStyle(
-                          color: context.colors.accentLight,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
+                    FlatChip(label: 'LIMITED OFFER', accent: true),
                     SizedBox(height: 10),
                     Text(
                       'Get 15% off\nyour first booking!',
@@ -776,7 +849,8 @@ class _PromoBanner extends StatelessWidget {
                       ),
                     ),
                     Spacer(),
-                    GestureDetector(
+                    // Clear glass is right here: a control floating on a photo.
+                    TapTarget(
                       onTap: () => context.push(AppConstants.routeBookingNew),
                       child: GlassPill(
                         blur: true,

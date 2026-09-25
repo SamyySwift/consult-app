@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:video_player/video_player.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/widgets/tap_target.dart';
 import '../../../core/widgets/slide_action_button.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -298,7 +299,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.plusJakartaSans(
                     color: const Color(0xFF888888),
-                    fontSize: 10.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -322,7 +323,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               fontSize: 14,
             ),
           ),
-          GestureDetector(
+          TapTarget(
             onTap: () => context.go(AppConstants.routeLogin),
             child: Text(
               'Sign In →',

@@ -7,6 +7,9 @@ import 'package:provider/provider.dart';
 import '../../../core/services/driver_location_access.dart';
 import '../../../core/theme/driver_colors.dart';
 import '../../../core/widgets/driver_button.dart';
+import '../../../core/widgets/glass.dart';
+import '../../../core/widgets/surface.dart';
+import '../../../core/widgets/tap_target.dart';
 import '../providers/job_provider.dart';
 import '../models/job_model.dart';
 
@@ -23,11 +26,11 @@ class _PickupConditionFormState extends State<PickupConditionForm> {
   final _descriptionController = TextEditingController();
   final List<File> _images = [];
   File? _audioFile;
-  
+
   final _audioRecorder = AudioRecorder();
   bool _isRecording = false;
   String? _audioPath;
-  
+
   bool _isSubmitting = false;
 
   @override
@@ -40,45 +43,38 @@ class _PickupConditionFormState extends State<PickupConditionForm> {
   Future<void> _pickImage() async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40, height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF333333),
-                  borderRadius: BorderRadius.circular(2),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => GlassBottomSheet(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: 14),
+              child: Text(
+                'Add Photo',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 12),
-                child: Text(
-                  'Add Photo',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.camera_alt_rounded, color: DriverColors.accent),
-                title: const Text('Take Photo', style: TextStyle(color: Colors.white)),
-                subtitle: const Text('Use your camera', style: TextStyle(color: Colors.white38, fontSize: 12)),
-                onTap: () => Navigator.pop(ctx, ImageSource.camera),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_rounded, color: DriverColors.accent),
-                title: const Text('Choose from Gallery', style: TextStyle(color: Colors.white)),
-                subtitle: const Text('Pick from your photos', style: TextStyle(color: Colors.white38, fontSize: 12)),
-                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-              ),
-            ],
-          ),
+            ),
+            GlassOptionTile(
+              icon: Icons.camera_alt_rounded,
+              title: 'Take Photo',
+              subtitle: 'Use your camera',
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            const SizedBox(height: 10),
+            GlassOptionTile(
+              icon: Icons.photo_library_rounded,
+              title: 'Choose from Gallery',
+              subtitle: 'Pick from your photos',
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
         ),
       ),
     );
@@ -119,7 +115,8 @@ class _PickupConditionFormState extends State<PickupConditionForm> {
       } else {
         if (await _audioRecorder.hasPermission()) {
           final dir = await getApplicationDocumentsDirectory();
-          final path = '${dir.path}/pickup_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+          final path =
+              '${dir.path}/pickup_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
           await _audioRecorder.start(
             const RecordConfig(encoder: AudioEncoder.aacLc),
             path: path,
@@ -140,7 +137,9 @@ class _PickupConditionFormState extends State<PickupConditionForm> {
     if (_descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please provide a text description of the vehicle condition.'),
+          content: Text(
+            'Please provide a text description of the vehicle condition.',
+          ),
           backgroundColor: DriverColors.error,
         ),
       );
@@ -159,7 +158,8 @@ class _PickupConditionFormState extends State<PickupConditionForm> {
 
     final hasLocation = await DriverLocationAccess.ensure(
       context,
-      reason: 'Your client tracks this delivery using your location. Turn it on to confirm pickup.',
+      reason:
+          'Your client tracks this delivery using your location. Turn it on to confirm pickup.',
     );
     if (!hasLocation || !mounted) return;
 
@@ -195,50 +195,22 @@ class _PickupConditionFormState extends State<PickupConditionForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xFF111111),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        border: Border.all(color: const Color(0xFF222222)),
+    return GlassBottomSheet(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        12,
+        24,
+        MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF333333),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            
-            const Text(
-              'Vehicle Pickup Condition',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Document the condition of the vehicle at pickup.',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-              textAlign: TextAlign.center,
+            const GlassSheetHeader(
+              icon: Icons.fact_check_rounded,
+              title: 'Vehicle Pickup Condition',
+              subtitle: 'Document the condition of the vehicle at pickup.',
             ),
             const SizedBox(height: 24),
 
@@ -251,34 +223,116 @@ class _PickupConditionFormState extends State<PickupConditionForm> {
                 hintText: 'Describe any scratches, dents, or notes...',
                 hintStyle: const TextStyle(color: Colors.white38),
                 filled: true,
-                fillColor: const Color(0xFF1A1A1A),
+                fillColor: Colors.white.withValues(alpha: 0.06),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.circular(22),
+                  borderSide: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.10),
+                  ),
                 ),
-                contentPadding: const EdgeInsets.all(16),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(22),
+                  borderSide: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.10),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(22),
+                  borderSide: const BorderSide(
+                    color: DriverColors.accent,
+                    width: 1.5,
+                  ),
+                ),
+                contentPadding: const EdgeInsets.all(18),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
             // Images Section
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
                   'Photos',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 17,
+                  ),
                 ),
-                IconButton(
-                  onPressed: _pickImage,
-                  icon: const Icon(Icons.add_a_photo, color: DriverColors.accent),
-                )
+                if (_images.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    '${_images.length}',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.55),
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                TapTarget(
+                  onTap: _pickImage,
+                  child: GlassPill(
+                    tint: DriverColors.accent,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.add_a_photo_rounded,
+                          color: DriverColors.accentLight,
+                          size: 16,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Add',
+                          style: TextStyle(
+                            color: DriverColors.accentLight,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
-            if (_images.isNotEmpty)
-              Container(
+            const SizedBox(height: 12),
+            if (_images.isEmpty)
+              GestureDetector(
+                onTap: _pickImage,
+                child: SurfaceCard(
+                  radius: 22,
+                  height: 100,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.photo_camera_outlined,
+                          color: Colors.white.withValues(alpha: 0.5),
+                          size: 26,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Tap to add at least one photo',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            else
+              SizedBox(
                 height: 100,
-                margin: const EdgeInsets.only(top: 8),
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   itemCount: _images.length,
@@ -290,7 +344,10 @@ class _PickupConditionFormState extends State<PickupConditionForm> {
                           width: 100,
                           height: 100,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.12),
+                            ),
                             image: DecorationImage(
                               image: FileImage(_images[index]),
                               fit: BoxFit.cover,
@@ -298,8 +355,8 @@ class _PickupConditionFormState extends State<PickupConditionForm> {
                           ),
                         ),
                         Positioned(
-                          top: 4,
-                          right: 16,
+                          top: 6,
+                          right: 18,
                           child: GestureDetector(
                             onTap: () {
                               setState(() {
@@ -312,7 +369,11 @@ class _PickupConditionFormState extends State<PickupConditionForm> {
                                 color: Colors.black54,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.close, color: Colors.white, size: 16),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 16,
+                              ),
                             ),
                           ),
                         ),
@@ -322,56 +383,93 @@ class _PickupConditionFormState extends State<PickupConditionForm> {
                 ),
               ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
             // Audio Section
             const Text(
               'Voice Note',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 17,
+              ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: _toggleRecording,
-                  child: CircleAvatar(
-                    backgroundColor: _isRecording ? DriverColors.error : const Color(0xFF222222),
-                    radius: 24,
-                    child: Icon(
-                      _isRecording ? Icons.stop : Icons.mic,
-                      color: _isRecording ? Colors.white : DriverColors.accent,
+            SurfaceCard(
+              radius: 22,
+              padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: _toggleRecording,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: _isRecording
+                            ? null
+                            : DriverColors.accentGradient,
+                        color: _isRecording ? DriverColors.error : null,
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                (_isRecording
+                                        ? DriverColors.error
+                                        : DriverColors.accent)
+                                    .withValues(alpha: 0.45),
+                            blurRadius: 14,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                        color: _isRecording ? Colors.white : Colors.black,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    _isRecording 
-                      ? 'Recording...' 
-                      : (_audioPath != null ? 'Voice note recorded.' : 'Tap to record voice note'),
-                    style: TextStyle(
-                      color: _isRecording ? DriverColors.error : Colors.white70,
-                      fontStyle: _audioPath != null ? FontStyle.italic : FontStyle.normal,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      _isRecording
+                          ? 'Recording...'
+                          : (_audioPath != null
+                                ? 'Voice note recorded.'
+                                : 'Tap to record voice note'),
+                      style: TextStyle(
+                        color: _isRecording
+                            ? DriverColors.error
+                            : Colors.white70,
+                        fontStyle: _audioPath != null
+                            ? FontStyle.italic
+                            : FontStyle.normal,
+                      ),
                     ),
                   ),
-                ),
-                if (_audioPath != null && !_isRecording)
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                    onPressed: () {
-                      setState(() {
-                        _audioPath = null;
-                        _audioFile = null;
-                      });
-                    },
-                  )
-              ],
+                  if (_audioPath != null && !_isRecording)
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.redAccent,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _audioPath = null;
+                          _audioFile = null;
+                        });
+                      },
+                    ),
+                ],
+              ),
             ),
-            
-            const SizedBox(height: 32),
+
+            const SizedBox(height: 28),
 
             if (_isSubmitting)
-              const Center(child: CircularProgressIndicator(color: DriverColors.accent))
+              const Center(
+                child: CircularProgressIndicator(color: DriverColors.accent),
+              )
             else
               DriverButton(
                 label: 'Submit & Confirm Pickup',

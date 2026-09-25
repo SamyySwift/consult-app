@@ -239,7 +239,7 @@ class _InsuranceCard extends StatelessWidget {
                               ),
                               child: Text(
                                 'RECOMMENDED',
-                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white),
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
                               ),
                             ),
                         ],

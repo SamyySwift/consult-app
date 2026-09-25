@@ -166,7 +166,7 @@ class DriverThemeColors extends ThemeExtension<DriverThemeColors> {
     surfaceVariant: Color(0xFF161616),// Secondary Carbon
     textPrimary: Color(0xFFFFFFFF),   // Pure White
     textSecondary: Color(0xFFA0A0A0), // Soft Gray
-    textLight: Color(0xFF666666),     // Muted Gray
+    textLight: Color(0xFF8A8A8A),     // Muted Gray, 6.1:1 on black
     textOnDark: Color(0xFFFFFFFF),
     success: Color(0xFF00C853),
     successLight: Color(0xFF0A2E14),
@@ -221,7 +221,7 @@ abstract final class DriverColors {
   static const Color surfaceVariant = Color(0xFF161616);
   static const Color textPrimary   = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFFA0A0A0);
-  static const Color textLight     = Color(0xFF666666);
+  static const Color textLight     = Color(0xFF8A8A8A);
   static const Color success       = Color(0xFF00C853);
   static const Color successLight  = Color(0xFF0A2E14);
   static const Color warning       = Color(0xFFFFB300);

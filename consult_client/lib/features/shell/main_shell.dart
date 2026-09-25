@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/motion.dart';
 import '../../../core/widgets/glass.dart';
 import '../notifications/providers/notification_provider.dart';
 import '../notifications/widgets/in_app_notification_banner.dart';
 
 class MainShell extends StatefulWidget {
-  final Widget child;
-  const MainShell({super.key, required this.child});
+  final StatefulNavigationShell navigationShell;
+  const MainShell({super.key, required this.navigationShell});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -38,18 +38,9 @@ class _MainShellState extends State<MainShell> {
     super.dispose();
   }
 
-  int _selectedIndex(String location) {
-    if (location.startsWith('/bookings')) return 1;
-    if (location.startsWith('/track')) return 2;
-    if (location.startsWith('/payments')) return 3;
-    if (location.startsWith('/profile')) return 4;
-    return 0;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final location = GoRouterState.of(context).matchedLocation;
-    final idx = _selectedIndex(location);
+    final shell = widget.navigationShell;
     final colors = context.colors;
 
     return Scaffold(
@@ -57,23 +48,12 @@ class _MainShellState extends State<MainShell> {
       // Tabs scroll under the floating glass nav; each adds bottom padding
       // from MediaQuery so its last item clears it.
       extendBody: true,
-      body: widget.child,
+      body: shell,
       bottomNavigationBar: _GlassNavBar(
-        selectedIndex: idx,
-        onSelect: (i) {
-          switch (i) {
-            case 0:
-              context.go(AppConstants.routeHome);
-            case 1:
-              context.go(AppConstants.routeBookings);
-            case 2:
-              context.go(AppConstants.routeTrack);
-            case 3:
-              context.go(AppConstants.routePayments);
-            case 4:
-              context.go(AppConstants.routeProfile);
-          }
-        },
+        selectedIndex: shell.currentIndex,
+        // Re-tapping the current tab returns it to its root.
+        onSelect: (i) =>
+            shell.goBranch(i, initialLocation: i == shell.currentIndex),
       ),
     );
   }
@@ -123,7 +103,9 @@ class _GlassNavBar extends StatelessWidget {
                 child: Stack(
                   children: [
                     AnimatedPositioned(
-                      duration: const Duration(milliseconds: 320),
+                      duration: reduceMotion(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 320),
                       curve: Curves.easeOutCubic,
                       left: itemWidth * selectedIndex,
                       top: 0,
@@ -153,7 +135,9 @@ class _GlassNavBar extends StatelessWidget {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(
-                                      i == selectedIndex ? _items[i].selectedIcon : _items[i].icon,
+                                      i == selectedIndex
+                                          ? _items[i].selectedIcon
+                                          : _items[i].icon,
                                       size: 22,
                                       color: i == selectedIndex
                                           ? colors.accent
@@ -168,7 +152,9 @@ class _GlassNavBar extends StatelessWidget {
                                         fontWeight: FontWeight.w600,
                                         color: i == selectedIndex
                                             ? Colors.white
-                                            : Colors.white.withValues(alpha: 0.6),
+                                            : Colors.white.withValues(
+                                                alpha: 0.6,
+                                              ),
                                       ),
                                     ),
                                   ],

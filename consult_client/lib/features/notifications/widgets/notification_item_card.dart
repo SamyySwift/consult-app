@@ -5,6 +5,8 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/glass.dart';
+import '../../../core/widgets/surface.dart';
+import '../../../core/widgets/tap_target.dart';
 import '../models/notification_model.dart';
 import '../providers/notification_provider.dart';
 
@@ -67,19 +69,21 @@ class NotificationItemCard extends StatelessWidget {
         },
         child: Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: GlassContainer(
+          // Unread is shown by the dot beside the timestamp, not a glow.
+          child: SurfaceCard(
             radius: 24,
-            glow: !notification.isRead,
             padding: const EdgeInsets.all(16),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Icon Badge
-                GlassContainer(
+                Container(
                   width: 44,
                   height: 44,
-                  radius: 22,
-                  tint: accentColor,
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
                   child: Icon(
                     notification.iconData,
                     color: accentColor,
@@ -96,16 +100,19 @@ class NotificationItemCard extends StatelessWidget {
                       // Top tag & timestamp row
                       Row(
                         children: [
-                          GlassPill(
-                            tint: accentColor,
+                          Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 9,
                               vertical: 3,
                             ),
+                            decoration: BoxDecoration(
+                              color: accentColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
                             child: Text(
                               notification.statusTag,
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 color: accentColor,
                                 letterSpacing: 0.5,
@@ -118,12 +125,14 @@ class NotificationItemCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
-                              color: Colors.white.withValues(alpha: 0.45),
+                              color: Colors.white.withValues(alpha: 0.55),
                             ),
                           ),
                           if (!notification.isRead) ...[
                             const SizedBox(width: 8),
-                            Container(
+                            Semantics(
+                              label: 'Unread',
+                              child: Container(
                               width: 8,
                               height: 8,
                               decoration: BoxDecoration(
@@ -136,6 +145,7 @@ class NotificationItemCard extends StatelessWidget {
                                   ),
                                 ],
                               ),
+                            ),
                             ),
                           ],
                         ],
@@ -173,7 +183,7 @@ class NotificationItemCard extends StatelessWidget {
                       // Booking Link Button
                       if (notification.bookingId != null) ...[
                         const SizedBox(height: 12),
-                        InkWell(
+                        TapTarget(
                           onTap: () {
                             if (!notification.isRead) {
                               context.read<NotificationProvider>().markAsRead(
@@ -182,7 +192,6 @@ class NotificationItemCard extends StatelessWidget {
                             }
                             context.go(AppConstants.routeTrack);
                           },
-                          borderRadius: BorderRadius.circular(999),
                           child: GlassPill(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,

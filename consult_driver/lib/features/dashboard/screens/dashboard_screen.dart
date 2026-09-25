@@ -5,9 +5,16 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/services/driver_location_access.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/driver_colors.dart';
+import '../../../core/utils/formatters.dart';
+import '../../../core/utils/motion.dart';
+import '../../../core/widgets/driver_button.dart';
+import '../../../core/widgets/glass.dart';
+import '../../../core/widgets/surface.dart';
+import '../../../core/widgets/tap_target.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../jobs/providers/job_provider.dart';
 import '../../jobs/models/job_model.dart';
+import '../../jobs/widgets/job_ui.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -29,58 +36,69 @@ class DashboardScreen extends StatelessWidget {
       );
     }
 
+    final assigned = jobProv.assignedJobs.length;
+    final inProgress = jobProv.activeJobs.length;
+    final completed = jobProv.totalCompleted;
+    final total = assigned + inProgress + completed;
+    double share(int n) => total == 0 ? 0 : n / total;
+    // One source of truth: the toggle, its tap handler and the empty state
+    // previously disagreed about the default when the profile hadn't loaded.
+    final isOnline = driver?.isOnline ?? false;
+
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: DriverColors.accent,
-          backgroundColor: const Color(0xFF161616),
-          onRefresh: () async {
-            await jobProv.fetchJobs();
-          },
-          child: CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    // ── Header Bar ──────────────────────────────────────────
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF161616),
-                                shape: BoxShape.circle,
-                                border: Border.all(color: const Color(0xFF262626)),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  driver?.initials ?? 'DR',
-                                  style: const TextStyle(
-                                    color: DriverColors.accent,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 16,
-                                  ),
-                                ),
+      body: Stack(
+        children: [
+          const Positioned.fill(child: _HeroBackdrop()),
+          RefreshIndicator(
+            color: DriverColors.accent,
+            backgroundColor: const Color(0xFF161616),
+            onRefresh: () async {
+              await jobProv.fetchJobs();
+            },
+            child: CustomScrollView(
+              // Pull-to-refresh must work even when the content is short.
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                // ── Header ──────────────────────────────────────────────
+                SliverToBoxAdapter(
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: DriverColors.accent.withValues(alpha: 0.12),
+                            ),
+                            child: Text(
+                              driver?.initials ?? 'DR',
+                              style: const TextStyle(
+                                color: DriverColors.accentLight,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Column(
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   driver?.firstName ?? 'Driver',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w800,
                                     color: Colors.white,
-                                    letterSpacing: -0.5,
+                                    letterSpacing: -0.6,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
@@ -99,8 +117,8 @@ class DashboardScreen extends StatelessWidget {
                                     const SizedBox(width: 8),
                                     Text(
                                       '•  ${driver?.totalJobs ?? 0} trips',
-                                      style: const TextStyle(
-                                        color: Color(0xFF888888),
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.6),
                                         fontSize: 12,
                                       ),
                                     ),
@@ -108,256 +126,306 @@ class DashboardScreen extends StatelessWidget {
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-
-                        // Online / Status Switch
-                        InkWell(
-                          onTap: () async {
-                            final goingOnline = !(driver?.isOnline ?? false);
-                            if (goingOnline) {
-                              final ok = await DriverLocationAccess.ensure(
-                                context,
-                                reason: 'Clients track their vehicle using your location. Turn it on to go online.',
-                              );
-                              if (!ok) return;
-                            }
-                            auth.toggleOnlineStatus();
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: (driver?.isOnline ?? true)
-                                  ? DriverColors.accent.withValues(alpha: 0.15)
-                                  : const Color(0xFF1C1C1E),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: (driver?.isOnline ?? true)
-                                    ? DriverColors.accent.withValues(alpha: 0.5)
-                                    : const Color(0xFF333333),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: (driver?.isOnline ?? true)
-                                        ? DriverColors.accent
-                                        : const Color(0xFF666666),
-                                    shape: BoxShape.circle,
-                                    boxShadow: (driver?.isOnline ?? true)
-                                        ? [
-                                            BoxShadow(
-                                              color: DriverColors.accent.withValues(alpha: 0.6),
-                                              blurRadius: 6,
-                                            )
-                                          ]
-                                        : null,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  (driver?.isOnline ?? true) ? 'ONLINE' : 'OFFLINE',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: (driver?.isOnline ?? true)
-                                        ? DriverColors.accent
-                                        : const Color(0xFF888888),
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
-                        ),
-                      ],
-                    ).animate().fadeIn().slideY(begin: -0.1, end: 0),
+                          const SizedBox(width: 10),
+                          _OnlineToggle(
+                            isOnline: isOnline,
+                            onTap: () async {
+                              final goingOnline = !isOnline;
+                              if (goingOnline) {
+                                final ok = await DriverLocationAccess.ensure(
+                                  context,
+                                  reason: 'Clients track their vehicle using your location. Turn it on to go online.',
+                                );
+                                if (!ok) return;
+                              }
+                              auth.toggleOnlineStatus();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ).motionAware(context).fadeIn().slideY(begin: -0.1, end: 0),
+                ),
 
-                    const SizedBox(height: 24),
+                // ── Job counts ──────────────────────────────────────────
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 48, 24, 0),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => context.go(AppRoutes.jobBoard),
+                      child: BracketedStats(
+                        label: 'Active Jobs',
+                        value: '${assigned + inProgress}',
+                        pills: [
+                          StatPillData(
+                            icon: Icons.assignment_rounded,
+                            value: '$assigned',
+                            label: 'Assigned',
+                            progress: share(assigned),
+                          ),
+                          StatPillData(
+                            icon: Icons.local_shipping_rounded,
+                            value: '$inProgress',
+                            label: 'In Progress',
+                            progress: share(inProgress),
+                          ),
+                          StatPillData(
+                            icon: Icons.check_circle_rounded,
+                            value: '$completed',
+                            label: 'Completed',
+                            progress: share(completed),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ).motionAware(context, delay: 100.ms).fadeIn(duration: 500.ms).slideY(begin: 0.08, end: 0),
+                ),
 
-                    // ── Stat Cards ──────────────────────────────────────────
-                    Row(
+                // ── Current mission / new assignment ────────────────────
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 40, 24, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: _TeslaStatCard(
-                            title: 'Active Jobs',
-                            value: '${jobProv.assignedJobs.length + jobProv.activeJobs.length}',
-                            icon: Icons.local_shipping_outlined,
-                            accentColor: DriverColors.accent,
-                            onTap: () => context.go(AppRoutes.jobBoard),
+                        if (activeJob != null) ...[
+                          _SectionHeader(
+                            title: 'Current Mission',
+                            actionLabel: 'Open Navigation',
+                            onAction: () => context.push(AppRoutes.activeJob),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _TeslaStatCard(
-                            title: 'Completed',
-                            value: '${jobProv.totalCompleted}',
-                            icon: Icons.check_circle_outline_rounded,
-                            accentColor: const Color(0xFF2979FF),
+                          const SizedBox(height: 14),
+                          _ActiveJobCard(job: activeJob),
+                        ] else if (pendingJob != null) ...[
+                          const _SectionHeader(title: 'New Assigned Job'),
+                          const SizedBox(height: 14),
+                          _PendingJobCard(job: pendingJob),
+                        ] else
+                          GestureDetector(
                             onTap: () => context.go(AppRoutes.jobBoard),
-                          ),
-                        ),
+                            // Only claim "online" when the driver actually is.
+                            child: isOnline
+                                ? const GlassEmptyState(
+                                    icon: Icons.local_shipping_outlined,
+                                    title: 'Standing By for Dispatch',
+                                    subtitle:
+                                        'You are online. New delivery assignments will appear here automatically in real time.',
+                                  )
+                                : const GlassEmptyState(
+                                    icon: Icons.power_settings_new_rounded,
+                                    title: 'You\'re Offline',
+                                    subtitle:
+                                        'Go online with the switch above to start receiving delivery assignments.',
+                                  ),
+                          ).motionAware(context, delay: 200.ms).fadeIn().slideY(begin: 0.05, end: 0),
                       ],
-                    ).animate(delay: 100.ms).fadeIn().slideY(begin: 0.1, end: 0),
-
-                    const SizedBox(height: 28),
-
-                    // ── Main section (Current Delivery / New Assignment) ────
-                    if (activeJob != null) ...[
-                      _TeslaSectionHeader(
-                        title: 'Current Mission',
-                        actionLabel: 'Open Navigation',
-                        onAction: () => context.go(AppRoutes.activeJob),
-                      ),
-                      const SizedBox(height: 12),
-                      _TeslaActiveJobCard(job: activeJob),
-                    ] else if (pendingJob != null) ...[
-                      const _TeslaSectionHeader(title: 'New Assigned Job'),
-                      const SizedBox(height: 12),
-                      _TeslaPendingJobCard(job: pendingJob),
-                    ] else ...[
-                      _TeslaAwaitingCard(),
-                    ],
-
-                    const SizedBox(height: 28),
-
-                    // ── Recent Deliveries ───────────────────────────────────
-                    if (jobProv.completedJobs.isNotEmpty) ...[
-                      _TeslaSectionHeader(
-                        title: 'Recent Deliveries',
-                        actionLabel: 'See All',
-                        onAction: () => context.go(AppRoutes.jobBoard),
-                      ),
-                      const SizedBox(height: 12),
-                      ...jobProv.completedJobs.take(3).map(
-                        (j) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _TeslaCompletedJobRow(job: j),
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 32),
-                  ]),
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
-// ── Tesla Stat Card ─────────────────────────────────────────────────────────
+                // ── Recent deliveries ───────────────────────────────────
+                if (jobProv.completedJobs.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _SectionHeader(
+                            title: 'Recent Deliveries',
+                            actionLabel: 'See All',
+                            onAction: () => context.go(AppRoutes.jobBoard),
+                          ),
+                          const SizedBox(height: 14),
+                          ...jobProv.completedJobs.take(3).map(
+                                (j) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _CompletedJobRow(job: j),
+                                ),
+                              ),
+                        ],
+                      ),
+                    ),
+                  ),
 
-class _TeslaStatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color accentColor;
-  final VoidCallback? onTap;
-
-  const _TeslaStatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.accentColor,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF111111),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF222222)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF888888),
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.2,
+                // Clear the floating nav bar.
+                SliverToBoxAdapter(
+                  child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 24),
                 ),
-              ),
-              Icon(icon, color: accentColor, size: 18),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              letterSpacing: -0.5,
+              ],
             ),
           ),
         ],
       ),
-    ),
-    ),
-    ),
     );
   }
 }
 
-// ── Tesla Section Header ────────────────────────────────────────────────────
+// ── Hero backdrop: graded car-carrier photo fading into black ─────────────
+class _HeroBackdrop extends StatelessWidget {
+  const _HeroBackdrop();
 
-class _TeslaSectionHeader extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final height = MediaQuery.sizeOf(context).height;
+
+    return Stack(
+      children: [
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: height * 0.5,
+          // Modulate (not multiply) so the green tint only touches the photo's
+          // own pixels; multiply also paints transparent areas.
+          child: Image.network(
+            AppConstants.heroImageUrl,
+            fit: BoxFit.cover,
+            alignment: const Alignment(0.15, 0),
+            color: const Color(0xFF6E9C86),
+            colorBlendMode: BlendMode.modulate,
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          ),
+        ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: height * 0.5 + 1,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: const [0, 0.25, 0.6, 0.92],
+                colors: [
+                  Colors.black.withValues(alpha: 0.6),
+                  Colors.black.withValues(alpha: 0.2),
+                  Colors.black.withValues(alpha: 0.6),
+                  Colors.black,
+                ],
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: height * 0.36,
+          left: -80,
+          right: -80,
+          height: height * 0.45,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                colors: [
+                  DriverColors.accent.withValues(alpha: 0.14),
+                  DriverColors.accent.withValues(alpha: 0),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Online / offline switch ────────────────────────────────────────────────
+class _OnlineToggle extends StatelessWidget {
+  final bool isOnline;
+  final VoidCallback onTap;
+
+  const _OnlineToggle({required this.isOnline, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      toggled: isOnline,
+      // The pill is ~32pt tall; the hit region is padded out to 44pt.
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: TapTarget.minSize,
+            minHeight: TapTarget.minSize,
+          ),
+          child: Center(
+            widthFactor: 1,
+            heightFactor: 1,
+            child: GlassPill(
+          blur: true,
+          glow: isOnline,
+          tint: isOnline ? DriverColors.accent : null,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: isOnline ? DriverColors.accent : const Color(0xFF777777),
+                  shape: BoxShape.circle,
+                  boxShadow: isOnline
+                      ? [BoxShadow(color: DriverColors.accent.withValues(alpha: 0.7), blurRadius: 8)]
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 7),
+              Text(
+                isOnline ? 'ONLINE' : 'OFFLINE',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: isOnline ? DriverColors.accentLight : Colors.white.withValues(alpha: 0.6),
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ],
+          ),
+        ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Section header ────────────────────────────────────────────────────────
+class _SectionHeader extends StatelessWidget {
   final String title;
   final String? actionLabel;
   final VoidCallback? onAction;
 
-  const _TeslaSectionHeader({required this.title, this.actionLabel, this.onAction});
+  const _SectionHeader({required this.title, this.actionLabel, this.onAction});
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-            letterSpacing: -0.3,
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              letterSpacing: -0.3,
+            ),
           ),
         ),
         if (actionLabel != null)
-          InkWell(
+          TapTarget(
             onTap: onAction,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-              child: Text(
-                actionLabel!,
-                style: const TextStyle(
-                  color: DriverColors.accent,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
+            child: Text(
+              actionLabel!,
+              style: const TextStyle(
+                color: DriverColors.accent,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -366,424 +434,201 @@ class _TeslaSectionHeader extends StatelessWidget {
   }
 }
 
-// ── Tesla Active Job Card ───────────────────────────────────────────────────
-
-class _TeslaActiveJobCard extends StatelessWidget {
+// ── Current mission: luminous glass card ──────────────────────────────────
+class _ActiveJobCard extends StatelessWidget {
   final JobModel job;
-  const _TeslaActiveJobCard({required this.job});
+  const _ActiveJobCard({required this.job});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF111111),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: DriverColors.accent.withValues(alpha: 0.35)),
-        boxShadow: [
-          BoxShadow(
-            color: DriverColors.accent.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => context.go(AppRoutes.activeJob),
-          borderRadius: BorderRadius.circular(22),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return GestureDetector(
+      onTap: () => context.push(AppRoutes.activeJob),
+      child: GlassContainer(
+        radius: 30,
+        blur: true,
+        glow: true,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                // Top vehicle info & status badge
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1C1C1E),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(job.vehicle.icon, color: DriverColors.accent, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            job.vehicle.displayName,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '#${job.id}  •  ${job.vehicle.color}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF888888),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: DriverColors.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: DriverColors.accent.withValues(alpha: 0.4)),
-                      ),
-                      child: Text(
-                        job.statusLabel.toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: DriverColors.accent,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ],
+                IconTile(
+                  icon: job.vehicle.icon,
+                  size: 50,
+                  iconSize: 24,
+                  radius: 17,
+                  tint: DriverColors.accent,
                 ),
-
-                const SizedBox(height: 18),
-                const Divider(color: Color(0xFF222222), height: 1),
-                const SizedBox(height: 18),
-
-                // Pickup & Dropoff
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Column(
-                      children: [
-                        const Icon(Icons.circle, size: 10, color: DriverColors.accent),
-                        Container(
-                          width: 2,
-                          height: 26,
-                          color: const Color(0xFF262626),
-                          margin: const EdgeInsets.symmetric(vertical: 3),
-                        ),
-                        const Icon(Icons.location_on_rounded, size: 12, color: Colors.white),
-                      ],
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            job.pickup.address,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white70,
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          Text(
-                            job.dropoff.address,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        job.vehicle.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
                       ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // Action button
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: DriverColors.accent,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'Manage Mission',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                        letterSpacing: 0.2,
+                      const SizedBox(height: 2),
+                      Text(
+                        '#${shortRef(job.id)}  •  ${job.vehicle.color}',
+                        style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.5)),
                       ),
-                    ),
+                    ],
                   ),
                 ),
+                const SizedBox(width: 8),
+                JobStatusChip(job: job),
               ],
             ),
-          ),
+            const SizedBox(height: 18),
+            JobRouteLines(job: job),
+            const SizedBox(height: 20),
+            GlassPillButton(
+              icon: Icons.navigation_rounded,
+              label: 'Manage Mission',
+              onTap: () => context.push(AppRoutes.activeJob),
+            ),
+          ],
         ),
       ),
-    ).animate(delay: 200.ms).fadeIn().slideY(begin: 0.05, end: 0);
+    ).motionAware(context, delay: 200.ms).fadeIn().slideY(begin: 0.05, end: 0);
   }
 }
 
-// ── Tesla Pending Job Card ──────────────────────────────────────────────────
-
-class _TeslaPendingJobCard extends StatelessWidget {
+// ── New assignment awaiting confirmation ──────────────────────────────────
+class _PendingJobCard extends StatelessWidget {
   final JobModel job;
-  const _TeslaPendingJobCard({required this.job});
+  const _PendingJobCard({required this.job});
 
   @override
   Widget build(BuildContext context) {
     final jobProv = context.watch<JobProvider>();
 
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF111111),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF262626)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => context.go(AppRoutes.jobBoard),
-          borderRadius: BorderRadius.circular(22),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFB300).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
+    return GestureDetector(
+      onTap: () => context.go(AppRoutes.jobBoard),
+      child: GlassContainer(
+        radius: 30,
+        blur: true,
+        glow: true,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const IconTile(
+                  icon: Icons.assignment_rounded,
+                  size: 50,
+                  iconSize: 22,
+                  radius: 17,
+                  tint: DriverColors.warning,
                 ),
-                child: const Icon(Icons.assignment_rounded, color: Color(0xFFFFB300), size: 20),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Assigned to You',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Assigned to You',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 17),
                       ),
-                    ),
-                    Text(
-                      'Awaiting your confirmation',
-                      style: TextStyle(color: Color(0xFF888888), fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Divider(color: Color(0xFF222222), height: 1),
-          const SizedBox(height: 16),
-
-          Text(
-            job.vehicle.displayName,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: 15,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Route: ${job.pickup.address.split(',').first} → ${job.dropoff.address.split(',').first}',
-            style: const TextStyle(color: Color(0xFFA0A0A0), fontSize: 13),
-          ),
-          const SizedBox(height: 20),
-
-          ElevatedButton(
-            onPressed: jobProv.isLoading
-                ? null
-                : () async {
-                    final ok = await DriverLocationAccess.ensure(
-                      context,
-                      reason: 'Your client tracks this delivery using your location. Turn it on to accept the job.',
-                    );
-                    if (!ok || !context.mounted) return;
-                    await jobProv.confirmJob(job.id);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Job confirmed! Proceed to pickup.'),
-                          backgroundColor: Color(0xFF161616),
-                        ),
-                      );
-                      context.go(AppRoutes.activeJob);
-                    }
-                  },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: DriverColors.accent,
-              foregroundColor: Colors.black,
-              minimumSize: const Size(double.infinity, 48),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-            ),
-            child: jobProv.isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
-                  )
-                : const Text('Confirm Assignment'),
-          ),
-        ],
-      ),
-    ),
-    ),
-    ),
-    ).animate(delay: 200.ms).fadeIn().slideY(begin: 0.05, end: 0);
-  }
-}
-
-// ── Tesla Awaiting Card ─────────────────────────────────────────────────────
-
-class _TeslaAwaitingCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF111111),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF222222)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => context.go(AppRoutes.jobBoard),
-          borderRadius: BorderRadius.circular(22),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-            child: Column(
-              children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Color(0xFF161616),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.local_shipping_outlined,
-              size: 36,
-              color: DriverColors.accent,
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Standing By for Dispatch',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'You are online. New delivery assignments will appear here automatically in real time.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFF888888),
-              height: 1.4,
-              fontSize: 13,
-            ),
-          ),
-        ],
-      ),
-    ),
-    ),
-    ),
-    ).animate(delay: 200.ms).fadeIn().slideY(begin: 0.05, end: 0);
-  }
-}
-
-// ── Tesla Completed Job Row ─────────────────────────────────────────────────
-
-class _TeslaCompletedJobRow extends StatelessWidget {
-  final JobModel job;
-  const _TeslaCompletedJobRow({required this.job});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF111111),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1E1E1E)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => context.go(AppRoutes.jobBoard),
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: DriverColors.accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.task_alt_rounded, color: DriverColors.accent, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  job.vehicle.displayName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: Colors.white,
+                      Text(
+                        'Awaiting your confirmation',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '#${job.id}  •  ${job.dropoff.address.split(',').first}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF888888)),
                 ),
               ],
             ),
-          ),
-          const SizedBox(width: 8),
-          const Text(
-            'Delivered',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: DriverColors.accent,
+            const SizedBox(height: 18),
+            Text(
+              job.vehicle.displayName,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            JobRouteLines(job: job),
+            const SizedBox(height: 22),
+            DriverButton(
+              label: 'Confirm Assignment',
+              isLoading: jobProv.isLoading,
+              onPressed: jobProv.isLoading
+                  ? null
+                  : () async {
+                      final ok = await DriverLocationAccess.ensure(
+                        context,
+                        reason: 'Your client tracks this delivery using your location. Turn it on to accept the job.',
+                      );
+                      if (!ok || !context.mounted) return;
+                      await jobProv.confirmJob(job.id);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Job confirmed! Proceed to pickup.'),
+                            backgroundColor: Color(0xFF161616),
+                          ),
+                        );
+                        context.push(AppRoutes.activeJob);
+                      }
+                    },
+            ),
+          ],
+        ),
       ),
-    ),
-    ),
-    ),
+    ).motionAware(context, delay: 200.ms).fadeIn().slideY(begin: 0.05, end: 0);
+  }
+}
+
+// ── Recent delivery row ───────────────────────────────────────────────────
+class _CompletedJobRow extends StatelessWidget {
+  final JobModel job;
+  const _CompletedJobRow({required this.job});
+
+  @override
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      onTap: () => context.go(AppRoutes.jobBoard),
+      radius: 22,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+          children: [
+            const IconTile(
+              icon: Icons.task_alt_rounded,
+              size: 42,
+              iconSize: 19,
+              tint: DriverColors.accent,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    job.vehicle.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.white),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '#${shortRef(job.id)}  •  ${job.dropoff.address.split(',').first}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.5)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Delivered',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: DriverColors.accent),
+            ),
+          ],
+        ),
     );
   }
 }

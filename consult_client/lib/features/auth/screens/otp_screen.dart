@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:pinput/pinput.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/utils/motion.dart';
 import '../providers/auth_provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
@@ -197,7 +198,7 @@ class _OtpScreenState extends State<OtpScreen> {
                                 size: 40,
                                 color: Colors.white,
                               ),
-                            ).animate().scale(
+                            ).motionAware(context).scale(
                               duration: 500.ms,
                               curve: Curves.elasticOut,
                             ),
@@ -346,7 +347,7 @@ class _OtpScreenState extends State<OtpScreen> {
                                     ],
                                   ),
                                 )
-                                .animate(delay: 100.ms)
+                                .motionAware(context, delay: 100.ms)
                                 .fadeIn(duration: 400.ms)
                                 .slideY(begin: 0.08),
                       ),

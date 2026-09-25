@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/utils/motion.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/validators.dart';
@@ -78,7 +79,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       size: 40,
                       color: Colors.white,
                     ),
-                  ).animate().scale(duration: 500.ms, curve: Curves.elasticOut),
+                  ).motionAware(context).scale(duration: 500.ms, curve: Curves.elasticOut),
 
                   SizedBox(height: 32),
 
@@ -104,7 +105,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                 onSubmit: _submit,
                               ),
                       )
-                      .animate(delay: 100.ms)
+                      .motionAware(context, delay: 100.ms)
                       .fadeIn(duration: 400.ms)
                       .slideY(begin: 0.08),
                 ],
@@ -197,7 +198,7 @@ class _SuccessView extends StatelessWidget {
             color: context.colors.success,
             size: 36,
           ),
-        ).animate().scale(duration: 400.ms, curve: Curves.elasticOut),
+        ).motionAware(context).scale(duration: 400.ms, curve: Curves.elasticOut),
         SizedBox(height: 16),
         Text(
           'Check Your Email',

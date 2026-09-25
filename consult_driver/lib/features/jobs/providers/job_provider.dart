@@ -18,6 +18,11 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool _startingTracking = false;
   LocationAccess? _locationAccess;
 
+  /// The driver's latest position while tracking an active job. A separate
+  /// notifier so the map can follow it without rebuilding every listener of
+  /// this provider on each GPS fix.
+  final ValueNotifier<Position?> driverPosition = ValueNotifier(null);
+
   List<JobModel> get allJobs => List.unmodifiable(_allJobs);
   bool get isLoading => _isLoading;
 
@@ -43,6 +48,7 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
     _serviceStatusSub?.cancel();
     _pollingTimer?.cancel();
     _stopLocationTracking();
+    driverPosition.dispose();
     super.dispose();
   }
 
@@ -350,6 +356,7 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
       ).listen(
         (Position? position) {
           if (position != null) {
+            driverPosition.value = position;
             _updateDriverLocation(jobId, position.latitude, position.longitude);
           }
         },

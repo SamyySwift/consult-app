@@ -21,6 +21,13 @@ class AppConstants {
   static const String appName = 'Carpital Consult Driver';
   static const String appVersion = '1.0.0';
 
+  // TODO: confirm this placeholder address before release (same as client).
+  static const String supportEmail = 'support@carpitalconsult.com';
+
+  /// Highway freight-truck hero photo shown behind the dashboard and auth screens.
+  static const String heroImageUrl =
+      'https://images.unsplash.com/photo-1519003722824-194d4455a60c?q=80&w=2000&auto=format&fit=crop';
+
   // Supabase Configuration
   static const String supabaseUrl = 'https://ulksjcitenlxtvxwvktw.supabase.co';
   static String get supabaseAnonKey =>
@@ -29,6 +36,13 @@ class AppConstants {
   // Railway API Configuration
   static String get apiBaseUrl =>
       dotenv.env['API_BASE_URL'] ?? 'https://carpitalconsult.com';
+
+  /// Mapbox public token (`pk.…`) for map tiles. Null when not configured,
+  /// in which case maps fall back to OpenStreetMap tiles.
+  static String? get mapboxToken {
+    final token = dotenv.isInitialized ? dotenv.env['MAPBOX_PUBLIC_TOKEN'] : null;
+    return (token == null || token.isEmpty) ? null : token;
+  }
 
   // Storage Keys
   static const String keyUserData = 'driver_user_data';

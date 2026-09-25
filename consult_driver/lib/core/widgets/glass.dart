@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../theme/driver_colors.dart';
 import '../utils/motion.dart';
 import 'surface.dart';
 
@@ -333,7 +333,7 @@ class GlassIconButton extends StatelessWidget {
               color: Colors.white,
             ),
           ),
-          backgroundColor: context.colors.error,
+          backgroundColor: DriverColors.error,
           child: Icon(
             icon,
             color: iconColor ?? Colors.white,
@@ -787,7 +787,7 @@ class GlassEmptyState extends StatelessWidget {
             size: 64,
             iconSize: 30,
             radius: 22,
-            accent: true,
+            tint: DriverColors.accent,
           ),
           const SizedBox(height: 16),
           Text(
@@ -875,6 +875,7 @@ class GlowButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool isLoading;
   final double height;
+  final Widget? icon;
 
   const GlowButton({
     super.key,
@@ -882,6 +883,7 @@ class GlowButton extends StatelessWidget {
     required this.onPressed,
     this.isLoading = false,
     this.height = 58,
+    this.icon,
   });
 
   @override
@@ -968,14 +970,20 @@ class GlowButton extends StatelessWidget {
                                   color: Colors.white,
                                 ),
                               )
-                            : Text(
-                                label,
-                                style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                  letterSpacing: 0.2,
-                                ),
+                            : Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (icon != null) ...[icon!, const SizedBox(width: 8)],
+                                  Text(
+                                    label,
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ],
                               ),
                       ),
                     ],
@@ -983,6 +991,146 @@ class GlowButton extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Frosted dark bottom sheet with a rounded top and a grab handle. Pass the
+/// keyboard inset in [padding] for sheets with text fields.
+class GlassBottomSheet extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  const GlassBottomSheet({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.fromLTRB(24, 12, 24, 24),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const radius = BorderRadius.vertical(top: Radius.circular(32));
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            color: const Color(0xF20D0E0E),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 5,
+                    margin: const EdgeInsets.only(bottom: 18),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+                Flexible(child: child),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Icon tile + title + subtitle heading used at the top of sheets and forms.
+class GlassSheetHeader extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Color? color;
+
+  const GlassSheetHeader({super.key, required this.icon, required this.title, this.subtitle, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = color ?? context.colors.accent;
+    return Column(
+      children: [
+        GlassContainer(
+          width: 58,
+          height: 58,
+          radius: 20,
+          tint: tint,
+          child: Icon(icon, size: 26, color: color ?? context.colors.accentLight),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -0.3),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            subtitle!,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.6), height: 1.4),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Tappable glass row: icon tile, title and optional subtitle, with a chevron.
+class GlassOptionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onTap;
+
+  const GlassOptionTile({super.key, required this.icon, required this.title, this.subtitle, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: GlassContainer(
+          radius: 22,
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              GlassContainer(
+                width: 44,
+                height: 44,
+                radius: 15,
+                tint: context.colors.accent,
+                child: Icon(icon, color: context.colors.accentLight, size: 21),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15)),
+                    if (subtitle != null)
+                      Text(subtitle!, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.35)),
+            ],
           ),
         ),
       ),

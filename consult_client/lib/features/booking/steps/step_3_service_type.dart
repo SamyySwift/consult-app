@@ -128,7 +128,7 @@ class _Step3ServiceTypeState extends State<Step3ServiceType> {
                                   ),
                                   child: Text(
                                     opt.badge!,
-                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
                                   ),
                                 ),
                               ],

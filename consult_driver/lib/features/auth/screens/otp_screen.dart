@@ -4,10 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:pinput/pinput.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/utils/motion.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/driver_colors.dart';
+import '../../../core/widgets/tap_target.dart';
 import '../../../core/widgets/driver_button.dart';
+import '../../../core/widgets/glass.dart';
 import '../providers/auth_provider.dart';
 
 class DriverOtpScreen extends StatefulWidget {
@@ -144,9 +147,9 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
         color: Colors.white,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFF161616),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2A2A2A), width: 1.2),
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1.2),
       ),
     );
 
@@ -154,13 +157,14 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
       decoration: defaultPinTheme.decoration!.copyWith(
         border: Border.all(color: DriverColors.accent, width: 2),
         color: DriverColors.accent.withValues(alpha: 0.08),
+        boxShadow: [BoxShadow(color: DriverColors.accent.withValues(alpha: 0.35), blurRadius: 14)],
       ),
     );
 
     final submittedPinTheme = defaultPinTheme.copyWith(
       decoration: defaultPinTheme.decoration!.copyWith(
         border: Border.all(color: DriverColors.accent.withValues(alpha: 0.5), width: 1.5),
-        color: const Color(0xFF1E1E1E),
+        color: DriverColors.accent.withValues(alpha: 0.06),
       ),
     );
 
@@ -170,23 +174,17 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
 
         return Scaffold(
           backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: Colors.black,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-              onPressed: () => context.go(AppRoutes.login),
-            ),
-            title: const Text(
-              'Security Verification',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-              ),
-            ),
-          ),
-          body: SafeArea(
+          body: Stack(
+            children: [
+              const Positioned.fill(child: AuroraBackground()),
+              Column(
+                children: [
+                  GlassPageHeader(
+                    title: 'Security Verification',
+                    showBack: true,
+                    onBack: () => context.go(AppRoutes.login),
+                  ),
+                  Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Column(
@@ -195,20 +193,18 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
                   const SizedBox(height: 20),
 
                   // Hero Icon
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      color: DriverColors.accent.withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: DriverColors.accent.withValues(alpha: 0.3), width: 1.5),
-                    ),
+                  GlassContainer(
+                    width: 84,
+                    height: 84,
+                    radius: 42,
+                    glow: true,
+                    tint: DriverColors.accent,
                     child: const Icon(
                       Icons.mark_email_read_outlined,
                       size: 38,
-                      color: DriverColors.accent,
+                      color: DriverColors.accentLight,
                     ),
-                  ).animate().scale(duration: 400.ms, curve: Curves.easeOutBack),
+                  ).motionAware(context).scale(duration: 400.ms, curve: Curves.easeOutBack),
 
                   const SizedBox(height: 24),
 
@@ -221,16 +217,16 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
                       letterSpacing: -0.5,
                     ),
                     textAlign: TextAlign.center,
-                  ).animate(delay: 100.ms).fadeIn().slideY(begin: 0.1),
+                  ).motionAware(context, delay: 100.ms).fadeIn().slideY(begin: 0.1),
 
                   const SizedBox(height: 10),
 
                   Text.rich(
                     TextSpan(
                       text: 'We have dispatched a 6-digit security code to\n',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF888888),
+                        color: Colors.white.withValues(alpha: 0.6),
                         height: 1.5,
                       ),
                       children: [
@@ -244,7 +240,7 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
                       ],
                     ),
                     textAlign: TextAlign.center,
-                  ).animate(delay: 200.ms).fadeIn(),
+                  ).motionAware(context, delay: 200.ms).fadeIn(),
 
                   const SizedBox(height: 36),
 
@@ -258,7 +254,7 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
                     onChanged: (v) => setState(() => _otp = v),
                     onCompleted: (_) => _verify(),
                     keyboardType: TextInputType.number,
-                  ).animate(delay: 250.ms).fadeIn().scale(),
+                  ).motionAware(context, delay: 250.ms).fadeIn().scale(),
 
                   const SizedBox(height: 32),
 
@@ -267,7 +263,7 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
                     label: 'Verify & Enter Portal',
                     onPressed: (_otp.length == 6 && !auth.isLoading) ? _verify : null,
                     isLoading: auth.isLoading,
-                  ).animate(delay: 300.ms).fadeIn().slideY(begin: 0.1),
+                  ).motionAware(context, delay: 300.ms).fadeIn().slideY(begin: 0.1),
 
                   const SizedBox(height: 28),
 
@@ -280,7 +276,7 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
                           "Didn't receive the code? ",
                           style: TextStyle(color: Color(0xFF777777), fontSize: 14),
                         ),
-                        GestureDetector(
+                        TapTarget(
                           onTap: auth.isLoading ? null : _resendCode,
                           child: const Text(
                             'Resend Code',
@@ -292,7 +288,7 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
                           ),
                         ),
                       ],
-                    ).animate().fadeIn(),
+                    ).motionAware(context).fadeIn(),
                   ] else ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -312,13 +308,17 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
                           ),
                         ),
                       ],
-                    ).animate().fadeIn(),
+                    ).motionAware(context).fadeIn(),
                   ],
 
                   const SizedBox(height: 40),
                 ],
               ),
             ),
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },

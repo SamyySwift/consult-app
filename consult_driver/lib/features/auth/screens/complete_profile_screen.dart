@@ -5,10 +5,13 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/utils/motion.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/driver_colors.dart';
 import '../../../core/widgets/driver_button.dart';
+import '../../../core/widgets/glass.dart';
+import '../../../core/widgets/surface.dart';
 import '../../../core/widgets/driver_text_field.dart';
 import '../../../core/utils/validators.dart';
 import '../providers/auth_provider.dart';
@@ -129,34 +132,10 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   Future<void> _pickAvatar() async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      backgroundColor: const Color(0xFF161616),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Select Profile Photo',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.camera_alt_outlined, color: DriverColors.accent),
-                title: const Text('Take a Selfie', style: TextStyle(color: Colors.white)),
-                onTap: () => Navigator.pop(context, ImageSource.camera),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined, color: DriverColors.accent),
-                title: const Text('Choose from Gallery', style: TextStyle(color: Colors.white)),
-                onTap: () => Navigator.pop(context, ImageSource.gallery),
-              ),
-            ],
-          ),
-        ),
+      backgroundColor: Colors.transparent,
+      builder: (context) => _SourceSheet(
+        title: 'Select Profile Photo',
+        cameraLabel: 'Take a Selfie',
       ),
     );
 
@@ -181,34 +160,10 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   Future<void> _pickLicenseImage() async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      backgroundColor: const Color(0xFF161616),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Upload Driver’s Licence',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.camera_alt_outlined, color: DriverColors.accent),
-                title: const Text('Take Photo of Licence', style: TextStyle(color: Colors.white)),
-                onTap: () => Navigator.pop(context, ImageSource.camera),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined, color: DriverColors.accent),
-                title: const Text('Choose from Gallery', style: TextStyle(color: Colors.white)),
-                onTap: () => Navigator.pop(context, ImageSource.gallery),
-              ),
-            ],
-          ),
-        ),
+      backgroundColor: Colors.transparent,
+      builder: (context) => _SourceSheet(
+        title: 'Upload Driver’s Licence',
+        cameraLabel: 'Take Photo of Licence',
       ),
     );
 
@@ -340,79 +295,47 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppRoutes.dashboard);
-            }
-          },
-        ),
-        title: const Text(
-          'Complete Driver Profile',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-            fontSize: 18,
-          ),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: DriverColors.accent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: DriverColors.accent.withValues(alpha: 0.4)),
-                ),
-                child: const Text(
-                  'KYC STEP',
-                  style: TextStyle(
-                    color: DriverColors.accent,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                  ),
-                ),
+      body: Stack(
+        children: [
+          const Positioned.fill(child: AuroraBackground()),
+          Column(
+            children: [
+              GlassPageHeader(
+                title: 'Complete Driver Profile',
+                showBack: true,
+                onBack: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go(AppRoutes.dashboard);
+                  }
+                },
               ),
-            ),
-          ),
-        ],
-      ),
-      body: SafeArea(
+              Expanded(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.paddingOf(context).bottom + 24),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Top Intro Card
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF161616),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF262626)),
-                  ),
+                SurfaceCard(
+                  radius: 26,
+                  padding: const EdgeInsets.all(18),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        width: 48,
+                        height: 48,
                         decoration: BoxDecoration(
-                          color: DriverColors.accent.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
+                          color: DriverColors.accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Icon(
                           Icons.verified_user_rounded,
-                          color: DriverColors.accent,
+                          color: DriverColors.accentLight,
                           size: 24,
                         ),
                       ),
@@ -421,6 +344,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            _KycStepPill(),
+                            SizedBox(height: 8),
                             Text(
                               'Identity & Verification',
                               style: TextStyle(
@@ -443,7 +368,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       ),
                     ],
                   ),
-                ).animate().fadeIn().slideY(begin: 0.1),
+                ).motionAware(context).fadeIn().slideY(begin: 0.1),
 
                 const SizedBox(height: 24),
 
@@ -463,15 +388,18 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                         child: Stack(
                           children: [
                             Container(
-                              width: 96,
-                              height: 96,
+                              width: 100,
+                              height: 100,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1C1C1C),
+                                color: Colors.white.withValues(alpha: 0.06),
                                 shape: BoxShape.circle,
                                 border: Border.all(
                                   color: DriverColors.accent.withValues(alpha: 0.6),
                                   width: 2,
                                 ),
+                                boxShadow: [
+                                  BoxShadow(color: DriverColors.accent.withValues(alpha: 0.3), blurRadius: 20),
+                                ],
                                 image: _avatarFile != null
                                     ? DecorationImage(
                                         image: FileImage(_avatarFile!),
@@ -493,7 +421,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                               child: Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
-                                  color: DriverColors.accent,
+                                  gradient: DriverColors.accentGradient,
                                   shape: BoxShape.circle,
                                   border: Border.all(color: Colors.black, width: 2),
                                 ),
@@ -597,22 +525,23 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFFCCCCCC),
+                              color: Color(0xBFFFFFFF),
                             ),
                           ),
                           const SizedBox(height: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF161616),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: const Color(0xFF262626)),
+                              color: DriverColors.surfaceVariant,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                             ),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
                                 value: _selectedState,
                                 isExpanded: true,
                                 dropdownColor: const Color(0xFF1A1A1A),
+                                borderRadius: BorderRadius.circular(18),
                                 style: const TextStyle(color: Colors.white, fontSize: 14),
                                 icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70),
                                 items: _nigerianStates.map((s) {
@@ -679,22 +608,23 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFFCCCCCC),
+                        color: Color(0xBFFFFFFF),
                       ),
                     ),
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF161616),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFF262626)),
+                        color: DriverColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           value: _emergencyRelationship,
                           isExpanded: true,
                           dropdownColor: const Color(0xFF1A1A1A),
+                                borderRadius: BorderRadius.circular(18),
                           style: const TextStyle(color: Colors.white, fontSize: 14),
                           icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70),
                           items: _relationships.map((r) {
@@ -757,7 +687,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFFCCCCCC),
+                        color: Color(0xBFFFFFFF),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -767,18 +697,18 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                         width: double.infinity,
                         height: 170,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF161616),
-                          borderRadius: BorderRadius.circular(16),
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(24),
                           border: Border.all(
                             color: _licenseImageFile != null
                                 ? DriverColors.accent
-                                : const Color(0xFF2E2E2E),
+                                : Colors.white.withValues(alpha: 0.12),
                             width: 1.5,
                           ),
                         ),
                         child: _licenseImageFile != null
                             ? ClipRRect(
-                                borderRadius: BorderRadius.circular(15),
+                                borderRadius: BorderRadius.circular(23),
                                 child: Stack(
                                   children: [
                                     Positioned.fill(
@@ -794,7 +724,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                         decoration: BoxDecoration(
                                           color: Colors.black.withValues(alpha: 0.75),
-                                          borderRadius: BorderRadius.circular(10),
+                                          borderRadius: BorderRadius.circular(999),
                                         ),
                                         child: const Row(
                                           mainAxisSize: MainAxisSize.min,
@@ -862,13 +792,16 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   label: 'Complete & Save Profile',
                   onPressed: auth.isLoading ? null : _handleSubmit,
                   isLoading: auth.isLoading,
-                ).animate(delay: 200.ms).fadeIn().scale(),
+                ).motionAware(context, delay: 200.ms).fadeIn().scale(),
 
-                const SizedBox(height: 32),
               ],
             ),
           ),
         ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -876,18 +809,75 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
-        Icon(icon, color: DriverColors.accent, size: 18),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-            letterSpacing: -0.3,
+        IconTile(
+          icon: icon,
+          size: 36,
+          iconSize: 18,
+          radius: 12,
+          tint: DriverColors.accent,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            title,
+            style: GoogleFonts.inter(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -0.3,
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// "KYC STEP" badge shown in the intro card.
+class _KycStepPill extends StatelessWidget {
+  const _KycStepPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return const FlatChip(label: 'KYC STEP', color: DriverColors.accent);
+  }
+}
+
+/// Camera / gallery picker shown as a glass bottom sheet.
+class _SourceSheet extends StatelessWidget {
+  final String title;
+  final String cameraLabel;
+
+  const _SourceSheet({required this.title, required this.cameraLabel});
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassBottomSheet(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18),
+            ),
+          ),
+          GlassOptionTile(
+            icon: Icons.camera_alt_outlined,
+            title: cameraLabel,
+            onTap: () => Navigator.pop(context, ImageSource.camera),
+          ),
+          const SizedBox(height: 10),
+          GlassOptionTile(
+            icon: Icons.photo_library_outlined,
+            title: 'Choose from Gallery',
+            onTap: () => Navigator.pop(context, ImageSource.gallery),
+          ),
+        ],
+      ),
     );
   }
 }

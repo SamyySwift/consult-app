@@ -96,6 +96,14 @@ extension BookingStatusStage on BookingStatusEnum {
         BookingStatusEnum.delivered => 5,
       };
 
+  /// The vehicle is with a driver, so there's a live position to follow.
+  bool get isTrackable => switch (this) {
+        BookingStatusEnum.pickedUp ||
+        BookingStatusEnum.inTransit ||
+        BookingStatusEnum.outForDelivery => true,
+        _ => false,
+      };
+
   String get label => switch (this) {
         BookingStatusEnum.pending => 'Pending',
         BookingStatusEnum.confirmed => 'Confirmed',

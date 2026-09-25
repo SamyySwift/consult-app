@@ -15,6 +15,8 @@ import '../../../core/network/route_service.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/glass.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/surface.dart';
+import '../../../core/widgets/tap_target.dart';
 
 class TrackingScreen extends StatefulWidget {
   /// Booking to show first, e.g. from a booking card's Track button.
@@ -351,7 +353,7 @@ class _TrackingContentState extends State<_TrackingContent> {
                                 ? '© Mapbox © OpenStreetMap'
                                 : '© OpenStreetMap',
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 11,
                               color: Colors.white.withValues(alpha: 0.6),
                               shadows: [
                                 Shadow(color: Colors.black, blurRadius: 4),
@@ -559,7 +561,8 @@ class _TrackingContentState extends State<_TrackingContent> {
     }
 
     return SizedBox(
-      height: 56,
+      // 14 top padding + a 44pt tap target per chip.
+      height: 58,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.fromLTRB(24, 14, 24, 0),
@@ -568,7 +571,7 @@ class _TrackingContentState extends State<_TrackingContent> {
         itemBuilder: (context, i) {
           final b = widget.activeBookings[i];
           final isSelected = b.id == _booking.id;
-          return GestureDetector(
+          return TapTarget(
             onTap: () => widget.onSelectBooking(b),
             child: GlassPill(
               blur: true,
@@ -595,7 +598,7 @@ class _TrackingContentState extends State<_TrackingContent> {
                             text: '  #${shortRef(b.id)}',
                             style: TextStyle(
                               fontWeight: FontWeight.w500,
-                              color: Colors.white.withValues(alpha: 0.45),
+                              color: Colors.white.withValues(alpha: 0.55),
                             ),
                           ),
                       ],
@@ -619,23 +622,17 @@ class _TrackingContentState extends State<_TrackingContent> {
 
   Widget _bookingCard() {
     final booking = _booking;
-    return GlassContainer(
+    return SurfaceCard(
       radius: 24,
       padding: EdgeInsets.all(18),
       child: Column(
         children: [
           Row(
             children: [
-              GlassContainer(
-                width: 44,
-                height: 44,
+              IconTile(
+                icon: Icons.directions_car_rounded,
+                iconSize: 21,
                 radius: 15,
-                tint: context.colors.accent,
-                child: Icon(
-                  Icons.directions_car_rounded,
-                  color: context.colors.accentLight,
-                  size: 21,
-                ),
               ),
               SizedBox(width: 12),
               Expanded(
@@ -657,7 +654,7 @@ class _TrackingContentState extends State<_TrackingContent> {
                       'Booking #${shortRef(booking.id)}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.45),
+                        color: Colors.white.withValues(alpha: 0.55),
                       ),
                     ),
                   ],
@@ -673,16 +670,7 @@ class _TrackingContentState extends State<_TrackingContent> {
             SizedBox(height: 16),
             Row(
               children: [
-                GlassContainer(
-                  width: 44,
-                  height: 44,
-                  radius: 22,
-                  child: Icon(
-                    Icons.person_rounded,
-                    color: Colors.white.withValues(alpha: 0.85),
-                    size: 22,
-                  ),
-                ),
+                IconTile(icon: Icons.person_rounded, iconSize: 22, radius: 22),
                 SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -709,7 +697,6 @@ class _TrackingContentState extends State<_TrackingContent> {
                 if (booking.driverPhone != null)
                   GlassIconButton(
                     icon: Icons.phone_rounded,
-                    size: 42,
                     iconColor: context.colors.accent,
                     semanticLabel: 'Call driver',
                     onTap: () => _callDriver(context, booking.driverPhone!),
@@ -961,24 +948,12 @@ class _LiveProgressCard extends StatelessWidget {
     required String title,
     required String subtitle,
   }) {
-    return GlassContainer(
+    return SurfaceCard(
       radius: 24,
       padding: EdgeInsets.all(16),
       child: Row(
         children: [
-          GlassContainer(
-            width: 44,
-            height: 44,
-            radius: 15,
-            tint: highlighted ? context.colors.accent : null,
-            child: Icon(
-              icon,
-              size: 21,
-              color: highlighted
-                  ? context.colors.accentLight
-                  : Colors.white.withValues(alpha: 0.5),
-            ),
-          ),
+          IconTile(icon: icon, iconSize: 21, radius: 15, accent: highlighted),
           SizedBox(width: 14),
           Expanded(
             child: Column(

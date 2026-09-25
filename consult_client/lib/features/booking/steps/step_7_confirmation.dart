@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/utils/motion.dart';
 import '../providers/booking_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/widgets/tap_target.dart';
 import '../../../../core/widgets/custom_button.dart';
 
 class Step7Confirmation extends StatelessWidget {
@@ -44,7 +46,7 @@ class Step7Confirmation extends StatelessWidget {
                     ),
                     child: Icon(Icons.check_circle_rounded, color: context.colors.success, size: 64),
                   )
-                      .animate()
+                      .motionAware(context)
                       .scale(duration: 600.ms, curve: Curves.elasticOut)
                       .fadeIn(duration: 300.ms),
 
@@ -54,7 +56,7 @@ class Step7Confirmation extends StatelessWidget {
                     'Booking Confirmed! 🎉',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: context.colors.textPrimary),
-                  ).animate(delay: 300.ms).fadeIn(duration: 400.ms).slideY(begin: 0.2),
+                  ).motionAware(context, delay: 300.ms).fadeIn(duration: 400.ms).slideY(begin: 0.2),
 
                   SizedBox(height: 8),
 
@@ -62,7 +64,7 @@ class Step7Confirmation extends StatelessWidget {
                     'Your vehicle transport has been\nsuccessfully booked.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 15, color: context.colors.textSecondary, height: 1.5),
-                  ).animate(delay: 400.ms).fadeIn(duration: 400.ms),
+                  ).motionAware(context, delay: 400.ms).fadeIn(duration: 400.ms),
 
                   SizedBox(height: 32),
 
@@ -94,7 +96,7 @@ class Step7Confirmation extends StatelessWidget {
                           ),
                         ),
                         SizedBox(height: 12),
-                        GestureDetector(
+                        TapTarget(
                           onTap: () {
                             Clipboard.setData(ClipboardData(text: bookingId));
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -119,7 +121,7 @@ class Step7Confirmation extends StatelessWidget {
                         ),
                       ],
                     ),
-                  ).animate(delay: 500.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1),
+                  ).motionAware(context, delay: 500.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1),
 
                   SizedBox(height: 24),
 
@@ -173,7 +175,7 @@ class Step7Confirmation extends StatelessWidget {
                         ),
                       ],
                     ),
-                  ).animate(delay: 600.ms).fadeIn(duration: 400.ms),
+                  ).motionAware(context, delay: 600.ms).fadeIn(duration: 400.ms),
 
                   SizedBox(height: 28),
 
@@ -183,14 +185,14 @@ class Step7Confirmation extends StatelessWidget {
                       context.go(AppConstants.routeTrack);
                     },
                     icon: Icon(Icons.my_location_rounded, color: Colors.white, size: 18),
-                  ).animate(delay: 700.ms).fadeIn(),
+                  ).motionAware(context, delay: 700.ms).fadeIn(),
 
                   SizedBox(height: 12),
 
                   CustomButton.outlined(
                     label: 'Back to Home',
                     onPressed: () => context.go(AppConstants.routeHome),
-                  ).animate(delay: 800.ms).fadeIn(),
+                  ).motionAware(context, delay: 800.ms).fadeIn(),
 
                   SizedBox(height: 32),
                 ],

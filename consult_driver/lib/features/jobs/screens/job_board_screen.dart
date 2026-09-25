@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/services/driver_location_access.dart';
 import '../../../core/theme/driver_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../jobs/providers/job_provider.dart';
 import '../../jobs/models/job_model.dart';
+import '../../../core/utils/formatters.dart';
+import '../../../core/utils/motion.dart';
+import '../../../core/widgets/driver_button.dart';
+import '../../../core/widgets/glass.dart';
+import '../../../core/widgets/surface.dart';
+import '../widgets/job_ui.dart';
 
 class JobBoardScreen extends StatefulWidget {
   const JobBoardScreen({super.key});
@@ -34,196 +39,149 @@ class _JobBoardScreenState extends State<JobBoardScreen>
   @override
   Widget build(BuildContext context) {
     final jobProv = context.watch<JobProvider>();
+    String withCount(String label, int n) => n > 0 ? '$label ($n)' : label;
 
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        centerTitle: false,
-        title: const Text(
-          'Mission Board',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-            fontSize: 22,
-            letterSpacing: -0.5,
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(54),
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF141414),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF222222)),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              indicatorSize: TabBarIndicatorSize.tab,
-              indicator: BoxDecoration(
-                color: DriverColors.accent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              labelColor: Colors.black,
-              unselectedLabelColor: const Color(0xFF888888),
-              labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
-              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-              dividerColor: Colors.transparent,
-              tabs: [
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('Assigned'),
-                      if (jobProv.assignedJobs.isNotEmpty) ...[
-                        const SizedBox(width: 5),
-                        _TabBadge(count: jobProv.assignedJobs.length),
-                      ],
-                    ],
-                  ),
-                ),
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('Active'),
-                      if (jobProv.activeJobs.isNotEmpty) ...[
-                        const SizedBox(width: 5),
-                        _TabBadge(count: jobProv.activeJobs.length, isDark: true),
-                      ],
-                    ],
-                  ),
-                ),
-                const Tab(text: 'Completed'),
-              ],
-            ),
-          ),
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Stack(
         children: [
-          _AssignedJobsList(),
-          _ActiveJobsList(),
-          _CompletedJobsList(),
+          const Positioned.fill(child: AuroraBackground()),
+          Column(
+            children: [
+              const GlassPageHeader(title: 'Mission Board'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                child: AnimatedBuilder(
+                  animation: _tabController,
+                  builder: (context, _) => GlassSegmentedControl(
+                    labels: [
+                      withCount('Assigned', jobProv.assignedJobs.length),
+                      withCount('Active', jobProv.activeJobs.length),
+                      'Completed',
+                    ],
+                    selectedIndex: _tabController.index,
+                    onChanged: _tabController.animateTo,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _AssignedJobsList(),
+                    _ActiveJobsList(),
+                    _CompletedJobsList(),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Tab badge ─────────────────────────────────────────────────────────────────
+/// Leaves room for the floating nav bar under the last card.
+EdgeInsets _listPadding(BuildContext context) =>
+    EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.paddingOf(context).bottom + 24);
 
-class _TabBadge extends StatelessWidget {
-  final int count;
-  final bool isDark;
-  const _TabBadge({required this.count, this.isDark = false});
+/// One tab of the board: pull to refresh, a spinner on first load, and an
+/// empty state that still scrolls so pull-to-refresh works on it.
+class _JobList extends StatelessWidget {
+  final List<JobModel> Function(JobProvider) select;
+  final _JobCardVariant variant;
+  final _EmptyState empty;
+
+  const _JobList({
+    required this.select,
+    required this.variant,
+    required this.empty,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.black : const Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        '$count',
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
-          color: isDark ? DriverColors.accent : Colors.white,
-        ),
-      ),
+    final prov = context.watch<JobProvider>();
+    final jobs = select(prov);
+    final nothingLoaded = prov.assignedJobs.isEmpty &&
+        prov.activeJobs.isEmpty &&
+        prov.completedJobs.isEmpty;
+
+    final Widget list;
+    if (jobs.isEmpty) {
+      list = ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: _listPadding(context).copyWith(top: 40),
+        children: [
+          prov.isLoading && nothingLoaded
+              ? const Center(
+                  child: CircularProgressIndicator.adaptive(
+                    valueColor: AlwaysStoppedAnimation(DriverColors.accent),
+                  ),
+                )
+              : empty,
+        ],
+      );
+    } else {
+      list = ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: _listPadding(context),
+        itemCount: jobs.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 14),
+        itemBuilder: (context, i) => _JobCard(job: jobs[i], variant: variant)
+            .entrance(
+              context,
+              delay: Duration(milliseconds: i * 60),
+              slide: 0.05,
+            ),
+      );
+    }
+
+    return RefreshIndicator.adaptive(
+      color: DriverColors.accent,
+      onRefresh: prov.fetchJobs,
+      child: list,
     );
   }
 }
-
-// ── Assigned jobs list ────────────────────────────────────────────────────────
 
 class _AssignedJobsList extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    final jobs = context.watch<JobProvider>().assignedJobs;
-
-    if (jobs.isEmpty) {
-      return const _EmptyState(
-        icon: Icons.assignment_outlined,
-        title: 'No Pending Assignments',
-        subtitle: 'New vehicle transport jobs dispatched to you will show here.',
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: jobs.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 14),
-      itemBuilder: (context, i) =>
-          _JobCard(job: jobs[i], variant: _JobCardVariant.assigned)
-              .animate(delay: (i * 60).ms)
-              .fadeIn()
-              .slideY(begin: 0.05),
-    );
-  }
+  Widget build(BuildContext context) => _JobList(
+    select: (p) => p.assignedJobs,
+    variant: _JobCardVariant.assigned,
+    empty: const _EmptyState(
+      icon: Icons.assignment_outlined,
+      title: 'No Pending Assignments',
+      subtitle: 'New vehicle transport jobs dispatched to you will show here.',
+    ),
+  );
 }
-
-// ── Active jobs list ──────────────────────────────────────────────────────────
 
 class _ActiveJobsList extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    final jobs = context.watch<JobProvider>().activeJobs;
-
-    if (jobs.isEmpty) {
-      return const _EmptyState(
-        icon: Icons.local_shipping_outlined,
-        title: 'No Active Missions',
-        subtitle: 'Confirm an assigned job to begin transport route.',
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: jobs.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 14),
-      itemBuilder: (context, i) =>
-          _JobCard(job: jobs[i], variant: _JobCardVariant.active)
-              .animate(delay: (i * 60).ms)
-              .fadeIn()
-              .slideY(begin: 0.05),
-    );
-  }
+  Widget build(BuildContext context) => _JobList(
+    select: (p) => p.activeJobs,
+    variant: _JobCardVariant.active,
+    empty: const _EmptyState(
+      icon: Icons.local_shipping_outlined,
+      title: 'No Active Missions',
+      subtitle: 'Confirm an assigned job to begin transport route.',
+    ),
+  );
 }
-
-// ── Completed jobs list ───────────────────────────────────────────────────────
 
 class _CompletedJobsList extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    final jobs = context.watch<JobProvider>().completedJobs;
-
-    if (jobs.isEmpty) {
-      return const _EmptyState(
-        icon: Icons.task_alt_outlined,
-        title: 'No Completed Jobs',
-        subtitle: 'Your successfully delivered jobs will appear here.',
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: jobs.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 14),
-      itemBuilder: (context, i) =>
-          _JobCard(job: jobs[i], variant: _JobCardVariant.completed)
-              .animate(delay: (i * 60).ms)
-              .fadeIn()
-              .slideY(begin: 0.05),
-    );
-  }
+  Widget build(BuildContext context) => _JobList(
+    select: (p) => p.completedJobs,
+    variant: _JobCardVariant.completed,
+    empty: const _EmptyState(
+      icon: Icons.task_alt_outlined,
+      title: 'No Completed Jobs',
+      subtitle: 'Your successfully delivered jobs will appear here.',
+    ),
+  );
 }
 
 // ── Job card ──────────────────────────────────────────────────────────────────
@@ -238,158 +196,112 @@ class _JobCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isAssigned = variant == _JobCardVariant.assigned;
     final isActive = variant == _JobCardVariant.active;
+    final accent = job.status.color;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF111111),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isActive
-              ? DriverColors.accent.withValues(alpha: 0.4)
-              : isAssigned
-                  ? const Color(0xFFFFB300).withValues(alpha: 0.3)
-                  : const Color(0xFF222222),
-          width: isActive ? 1.4 : 1.0,
-        ),
-      ),
+    // Active missions get a green hairline instead of a glow.
+    return SurfaceCard(
+      radius: 26,
+      borderColor: isActive
+          ? DriverColors.accent.withValues(alpha: 0.45)
+          : null,
+      padding: const EdgeInsets.all(18),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Card header ──
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1C1C1E),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    job.vehicle.icon,
-                    color: isActive ? DriverColors.accent : Colors.white70,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        job.vehicle.displayName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '#${job.id}  •  ${job.vehicle.color}',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF888888)),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isAssigned
-                        ? const Color(0xFFFFB300).withValues(alpha: 0.15)
-                        : DriverColors.accent.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    job.statusLabel.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: isAssigned ? const Color(0xFFFFB300) : DriverColors.accent,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const Divider(height: 1, color: Color(0xFF1E1E1E)),
-
-          // ── Route ──
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Column(
+          // ── Header ──
+          Row(
+            children: [
+              IconTile(
+                icon: job.vehicle.icon,
+                size: 46,
+                iconSize: 21,
+                radius: 16,
+                tint: accent,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.circle, size: 9, color: DriverColors.accent),
-                    Container(
-                      width: 1.5,
-                      height: 20,
-                      color: const Color(0xFF262626),
-                      margin: const EdgeInsets.symmetric(vertical: 3),
+                    Text(
+                      job.vehicle.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: Colors.white,
+                      ),
                     ),
-                    const Icon(Icons.location_on_rounded, size: 11, color: Colors.white),
+                    const SizedBox(height: 2),
+                    Text(
+                      '#${shortRef(job.id)}  •  ${job.vehicle.color}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.5),
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        job.pickup.address,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13, color: Color(0xFFBBBBBB)),
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        job.dropoff.address,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w500),
-                      ),
-                    ],
+              ),
+              const SizedBox(width: 8),
+              JobStatusChip(job: job),
+            ],
+          ),
+
+          const SizedBox(height: 18),
+          JobRouteLines(job: job),
+          const SizedBox(height: 16),
+
+          // ── Service tags ──
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _Tag(label: job.serviceLabel, icon: Icons.speed_rounded),
+              _Tag(label: job.transportModeLabel, icon: Icons.garage_rounded),
+              if (job.hasInsurance)
+                const _Tag(
+                  label: 'Insured',
+                  icon: Icons.shield_rounded,
+                  color: DriverColors.accent,
+                ),
+            ],
+          ),
+
+          // ── Journey progress ──
+          if (isActive) ...[
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                const Text(
+                  'Journey',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${job.status.stage} of ${JobStage.stageCount}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withValues(alpha: 0.55),
                   ),
                 ),
               ],
             ),
-          ),
-
-          // ── Service tags ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-            child: Row(
-              children: [
-                _Tag(label: job.serviceLabel, icon: Icons.speed_rounded),
-                const SizedBox(width: 8),
-                _Tag(label: job.transportModeLabel, icon: Icons.garage_rounded),
-                if (job.hasInsurance) ...[
-                  const SizedBox(width: 8),
-                  const _Tag(
-                    label: 'Insured',
-                    icon: Icons.shield_rounded,
-                    color: DriverColors.accent,
-                  ),
-                ],
-              ],
+            const SizedBox(height: 10),
+            SegmentProgressBar(
+              total: JobStage.stageCount,
+              filled: job.status.stage,
             ),
-          ),
+          ],
 
-          // ── Action footer ──
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              color: Color(0xFF161616),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-            ),
-            child: _CardAction(job: job, variant: variant),
-          ),
+          const SizedBox(height: 18),
+          _CardAction(job: job, variant: variant),
         ],
       ),
     );
@@ -399,31 +311,12 @@ class _JobCard extends StatelessWidget {
 class _Tag extends StatelessWidget {
   final String label;
   final IconData icon;
-  final Color color;
-  const _Tag({
-    required this.label,
-    required this.icon,
-    this.color = const Color(0xFF888888),
-  });
+  final Color? color;
+  const _Tag({required this.label, required this.icon, this.color});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: color),
-          const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      FlatChip(label: label, icon: icon, color: color);
 }
 
 class _CardAction extends StatelessWidget {
@@ -436,66 +329,39 @@ class _CardAction extends StatelessWidget {
     switch (variant) {
       case _JobCardVariant.assigned:
         return Consumer<JobProvider>(
-          builder: (context, prov, _) => Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: prov.isLoading
-                      ? null
-                      : () async {
-                          final hasLocation = await DriverLocationAccess.ensure(
-                            context,
-                            reason: 'Your client tracks this delivery using your location. Turn it on to accept the job.',
-                          );
-                          if (!hasLocation || !context.mounted) return;
-                          final ok = await prov.confirmJob(job.id);
-                          if (ok && context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Mission confirmed! Proceeding to active.'),
-                                backgroundColor: Color(0xFF161616),
-                              ),
-                            );
-                            context.go(AppRoutes.activeJob);
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: DriverColors.accent,
-                    foregroundColor: Colors.black,
-                    minimumSize: const Size(0, 42),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
-                  ),
-                  child: prov.isLoading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
-                        )
-                      : const Text('Confirm Mission'),
-                ),
-              ),
-            ],
+          builder: (context, prov, _) => DriverButton(
+            label: 'Confirm Mission',
+            isLoading: prov.isLoading,
+            onPressed: prov.isLoading
+                ? null
+                : () async {
+                    final hasLocation = await DriverLocationAccess.ensure(
+                      context,
+                      reason:
+                          'Your client tracks this delivery using your location. Turn it on to accept the job.',
+                    );
+                    if (!hasLocation || !context.mounted) return;
+                    final ok = await prov.confirmJob(job.id);
+                    if (ok && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Mission confirmed! Proceeding to active.',
+                          ),
+                          backgroundColor: Color(0xFF161616),
+                        ),
+                      );
+                      context.push(AppRoutes.activeJob);
+                    }
+                  },
           ),
         );
 
       case _JobCardVariant.active:
-        return Row(
-          children: [
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => context.go(AppRoutes.activeJob),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: DriverColors.accent,
-                  foregroundColor: Colors.black,
-                  minimumSize: const Size(0, 42),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
-                ),
-                child: const Text('Mission Progress'),
-              ),
-            ),
-          ],
+        return GlassPillButton(
+          icon: Icons.navigation_rounded,
+          label: 'Mission Progress',
+          onTap: () => context.push(AppRoutes.activeJob),
         );
 
       case _JobCardVariant.completed:
@@ -504,18 +370,29 @@ class _CardAction extends StatelessWidget {
           children: [
             const Row(
               children: [
-                Icon(Icons.check_circle_rounded, color: DriverColors.accent, size: 16),
+                Icon(
+                  Icons.check_circle_rounded,
+                  color: DriverColors.accent,
+                  size: 16,
+                ),
                 SizedBox(width: 6),
                 Text(
                   'Delivered',
-                  style: TextStyle(color: DriverColors.accent, fontWeight: FontWeight.w700, fontSize: 13),
+                  style: TextStyle(
+                    color: DriverColors.accent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
             if (job.completedAt != null)
               Text(
                 _formatDate(job.completedAt!),
-                style: const TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.5),
+                ),
               ),
           ],
         );
@@ -523,7 +400,20 @@ class _CardAction extends StatelessWidget {
   }
 
   String _formatDate(DateTime dt) {
-    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
   }
 }
@@ -534,42 +424,18 @@ class _EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  const _EmptyState({required this.icon, required this.title, required this.subtitle});
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Color(0xFF141414),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 36, color: DriverColors.accent),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF888888), height: 1.4, fontSize: 13),
-            ),
-          ],
-        ),
-      ),
-    ).animate().fadeIn();
+    return GlassEmptyState(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+    ).entrance(context, slide: 0);
   }
 }

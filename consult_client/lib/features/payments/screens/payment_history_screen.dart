@@ -1,17 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import '../../booking/providers/booking_provider.dart';
 import '../../booking/models/booking_model.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/motion.dart';
 import '../../../core/widgets/glass.dart';
+import '../../../core/widgets/surface.dart';
 import '../../../core/widgets/status_badge.dart';
 
 bool _isPaid(BookingStatusEnum status) =>
     status != BookingStatusEnum.pending &&
     status != BookingStatusEnum.cancelled;
+
+/// Money actually paid: pending and cancelled bookings don't count.
+@visibleForTesting
+double totalPaid(Iterable<BookingModel> bookings) => bookings
+    .where((b) => _isPaid(b.status))
+    .fold<double>(0, (sum, b) => sum + b.totalAmount);
 
 class PaymentHistoryScreen extends StatelessWidget {
   const PaymentHistoryScreen({super.key});
@@ -26,14 +35,49 @@ class PaymentHistoryScreen extends StatelessWidget {
         final pending = payments
             .where((b) => b.status == BookingStatusEnum.pending)
             .length;
-        final spent = payments.fold<double>(0, (sum, b) => sum + b.totalAmount);
+        final spent = totalPaid(payments);
+
+        final Widget? placeholder;
+        if (payments.isEmpty && prov.isLoading) {
+          placeholder = const Padding(
+            padding: EdgeInsets.only(top: 24),
+            child: Center(child: CircularProgressIndicator.adaptive()),
+          );
+        } else if (payments.isEmpty && prov.errorMessage != null) {
+          placeholder = GlassEmptyState(
+            icon: Icons.cloud_off_rounded,
+            title: 'Couldn\'t Load Payments',
+            subtitle: 'Check your connection and try again.',
+            action: GlassPillButton(
+              icon: Icons.refresh_rounded,
+              label: 'Try Again',
+              onTap: prov.fetchBookings,
+            ),
+          );
+        } else if (payments.isEmpty) {
+          placeholder = GlassEmptyState(
+            icon: Icons.credit_card_off_rounded,
+            title: 'No Payments Yet',
+            subtitle: 'Payments for your bookings will appear here.',
+            action: GlassPillButton(
+              icon: Icons.add_rounded,
+              label: 'New Booking',
+              onTap: () => context.push(AppConstants.routeBookingNew),
+            ),
+          );
+        } else {
+          placeholder = null;
+        }
 
         return Scaffold(
           backgroundColor: Colors.black,
           body: Stack(
             children: [
               const Positioned.fill(child: AuroraBackground()),
-              CustomScrollView(
+              RefreshIndicator.adaptive(
+                onRefresh: prov.fetchBookings,
+                child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverToBoxAdapter(child: GlassPageHeader(title: 'Payments')),
 
@@ -49,7 +93,6 @@ class PaymentHistoryScreen extends StatelessWidget {
                             icon: Icons.receipt_long_rounded,
                             value: '$total',
                             label: 'Transactions',
-                            progress: total == 0 ? 0 : 1,
                           ),
                           StatPillData(
                             icon: Icons.check_circle_rounded,
@@ -65,7 +108,10 @@ class PaymentHistoryScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                    ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.08),
+                    ).entrance(
+                      context,
+                      duration: const Duration(milliseconds: 500),
+                    ),
                   ),
 
                   SliverToBoxAdapter(
@@ -83,15 +129,11 @@ class PaymentHistoryScreen extends StatelessWidget {
                   ),
 
                   // ── List ────────────────────────────────────────────────
-                  if (payments.isEmpty)
+                  if (placeholder != null)
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 24),
-                        child: GlassEmptyState(
-                          icon: Icons.credit_card_off_rounded,
-                          title: 'No Payments Yet',
-                          subtitle: 'Your payment history will appear here',
-                        ),
+                        child: placeholder,
                       ),
                     )
                   else
@@ -100,10 +142,12 @@ class PaymentHistoryScreen extends StatelessWidget {
                         final booking = payments[i];
                         return Padding(
                           padding: EdgeInsets.fromLTRB(24, 0, 24, 12),
-                          child: _PaymentCard(booking: booking)
-                              .animate(delay: Duration(milliseconds: i * 60))
-                              .fadeIn(duration: 300.ms)
-                              .slideY(begin: 0.05),
+                          child: _PaymentCard(booking: booking).entrance(
+                            context,
+                            delay: Duration(milliseconds: i * 60),
+                            duration: const Duration(milliseconds: 300),
+                            slide: 0.05,
+                          ),
                         );
                       }, childCount: payments.length),
                     ),
@@ -115,6 +159,7 @@ class PaymentHistoryScreen extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
               ),
             ],
           ),
@@ -134,24 +179,14 @@ class _PaymentCard extends StatelessWidget {
     final fmt = DateFormat('MMM d, yyyy');
     final isPaid = _isPaid(booking.status);
 
-    return GlassContainer(
+    return SurfaceCard(
       radius: 26,
       padding: EdgeInsets.all(18),
       child: Column(
         children: [
           Row(
             children: [
-              GlassContainer(
-                width: 44,
-                height: 44,
-                radius: 15,
-                tint: context.colors.accent,
-                child: Icon(
-                  Icons.local_shipping_rounded,
-                  color: context.colors.accentLight,
-                  size: 20,
-                ),
-              ),
+              IconTile(icon: Icons.local_shipping_rounded, radius: 15),
               SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -172,7 +207,7 @@ class _PaymentCard extends StatelessWidget {
                       '#${shortRef(booking.id)} · ${fmt.format(booking.createdAt)}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.45),
+                        color: Colors.white.withValues(alpha: 0.55),
                       ),
                     ),
                   ],
@@ -210,77 +245,22 @@ class _PaymentCard extends StatelessWidget {
           Container(height: 1, color: Colors.white.withValues(alpha: 0.06)),
           SizedBox(height: 14),
 
-          Row(
-            children: [
-              Expanded(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _ReceiptTag(
-                      label: booking.serviceName,
-                      icon: Icons.local_shipping_rounded,
-                    ),
-                    if (booking.hasInsurance)
-                      _ReceiptTag(label: 'Insured', icon: Icons.shield_rounded),
-                    if (booking.transportMode == TransportMode.enclosed)
-                      _ReceiptTag(
-                        label: 'Enclosed',
-                        icon: Icons.garage_rounded,
-                      ),
-                  ],
+          // Receipt link removed until receipts exist.
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FlatChip(
+                  label: booking.serviceName,
+                  icon: Icons.local_shipping_rounded,
                 ),
-              ),
-              GestureDetector(
-                onTap: () {},
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.receipt_long_rounded,
-                      size: 14,
-                      color: context.colors.accent,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      'Receipt',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: context.colors.accent,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReceiptTag extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  const _ReceiptTag({required this.label, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassPill(
-      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: Colors.white.withValues(alpha: 0.6)),
-          SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.white.withValues(alpha: 0.75),
-              fontWeight: FontWeight.w600,
+                if (booking.hasInsurance)
+                  FlatChip(label: 'Insured', icon: Icons.shield_rounded),
+                if (booking.transportMode == TransportMode.enclosed)
+                  FlatChip(label: 'Enclosed', icon: Icons.garage_rounded),
+              ],
             ),
           ),
         ],

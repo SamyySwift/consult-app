@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import '../../booking/providers/booking_provider.dart';
 import '../../booking/models/booking_model.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/widgets/glass.dart';
+import '../../../core/widgets/surface.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/tap_target.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/motion.dart';
 import '../../vehicles/models/vehicle_document_model.dart';
 import '../../vehicles/widgets/order_request_document_view.dart';
 
@@ -26,7 +28,10 @@ class _WaybillViewerWrapper extends StatelessWidget {
 }
 
 class MyBookingsScreen extends StatefulWidget {
-  const MyBookingsScreen({super.key});
+  /// Tab to open on: 0 All, 1 Active, 2 Done.
+  final int initialTab;
+
+  const MyBookingsScreen({super.key, this.initialTab = 0});
 
   @override
   State<MyBookingsScreen> createState() => _MyBookingsScreenState();
@@ -39,7 +44,19 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTab,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant MyBookingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTab != oldWidget.initialTab) {
+      _tabController.animateTo(widget.initialTab);
+    }
   }
 
   @override
@@ -83,9 +100,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     child: TabBarView(
                       controller: _tabController,
                       children: [
-                        _BookingList(bookings: all),
-                        _BookingList(bookings: active),
-                        _BookingList(bookings: completed),
+                        for (final list in [all, active, completed])
+                          _BookingList(
+                            bookings: list,
+                            isLoading: prov.isLoading && all.isEmpty,
+                            failed: prov.errorMessage != null && all.isEmpty,
+                            onRefresh: prov.fetchBookings,
+                          ),
                       ],
                     ),
                   ),
@@ -149,33 +170,71 @@ class _NewBookingButton extends StatelessWidget {
 
 class _BookingList extends StatelessWidget {
   final List<BookingModel> bookings;
-  const _BookingList({required this.bookings});
+  final bool isLoading;
+  final bool failed;
+  final Future<void> Function() onRefresh;
+
+  const _BookingList({
+    required this.bookings,
+    required this.isLoading,
+    required this.failed,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (bookings.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(24, 0, 24, 80),
-          child: GlassEmptyState(
-            icon: Icons.list_alt_rounded,
-            title: 'No Bookings',
-            subtitle: 'Your bookings will appear here',
-          ),
+    // Leave room for the floating nav and the New Booking button above it.
+    final padding = EdgeInsets.fromLTRB(
+      24,
+      12,
+      24,
+      MediaQuery.paddingOf(context).bottom + 96,
+    );
+
+    // Loading, error and empty states still sit in a scroll view so
+    // pull-to-refresh works on them too.
+    Widget? placeholder;
+    if (isLoading) {
+      placeholder = const Center(child: CircularProgressIndicator.adaptive());
+    } else if (failed) {
+      placeholder = GlassEmptyState(
+        icon: Icons.cloud_off_rounded,
+        title: 'Couldn\'t Load Bookings',
+        subtitle: 'Check your connection and try again.',
+        action: GlassPillButton(
+          icon: Icons.refresh_rounded,
+          label: 'Try Again',
+          onTap: onRefresh,
+        ),
+      );
+    } else if (bookings.isEmpty) {
+      placeholder = GlassEmptyState(
+        icon: Icons.list_alt_rounded,
+        title: 'No Bookings',
+        subtitle: 'Bookings you make will appear here.',
+        action: GlassPillButton(
+          icon: Icons.add_rounded,
+          label: 'New Booking',
+          onTap: () => context.push(AppConstants.routeBookingNew),
         ),
       );
     }
 
-    // Leave room for the floating nav and the New Booking button above it.
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(
-        24,
-        12,
-        24,
-        MediaQuery.paddingOf(context).bottom + 96,
-      ),
-      itemCount: bookings.length,
-      itemBuilder: (context, i) => _BookingTile(booking: bookings[i], index: i),
+    return RefreshIndicator.adaptive(
+      onRefresh: onRefresh,
+      child: placeholder != null
+          ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: padding.copyWith(top: 40),
+              children: [placeholder],
+            )
+          : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: padding,
+              itemCount: bookings.length,
+              itemBuilder: (context, i) =>
+                  _BookingTile(booking: bookings[i], index: i),
+            ),
     );
   }
 }
@@ -193,7 +252,7 @@ class _BookingTile extends StatelessWidget {
 
     return Padding(
           padding: EdgeInsets.only(bottom: 12),
-          child: GlassContainer(
+          child: SurfaceCard(
             radius: 26,
             padding: EdgeInsets.all(18),
             child: Column(
@@ -201,16 +260,10 @@ class _BookingTile extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    GlassContainer(
-                      width: 44,
-                      height: 44,
+                    IconTile(
+                      icon: Icons.directions_car_rounded,
+                      iconSize: 21,
                       radius: 15,
-                      tint: context.colors.accent,
-                      child: Icon(
-                        Icons.directions_car_rounded,
-                        color: context.colors.accentLight,
-                        size: 21,
-                      ),
                     ),
                     SizedBox(width: 12),
                     Expanded(
@@ -232,7 +285,7 @@ class _BookingTile extends StatelessWidget {
                             '#${shortRef(booking.id)} · ${fmt.format(booking.createdAt)}',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white.withValues(alpha: 0.45),
+                              color: Colors.white.withValues(alpha: 0.55),
                             ),
                           ),
                         ],
@@ -312,24 +365,11 @@ class _BookingTile extends StatelessWidget {
                       '${booking.status.stage} of ${BookingStatusStage.stageCount}',
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.white.withValues(alpha: 0.45),
+                        color: Colors.white.withValues(alpha: 0.55),
                       ),
                     ),
                     Spacer(),
-                    GlassPill(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      child: Text(
-                        booking.serviceName,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.white.withValues(alpha: 0.75),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
+                    FlatChip(label: booking.serviceName),
                   ],
                 ),
                 SizedBox(height: 10),
@@ -355,7 +395,7 @@ class _BookingTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                    GestureDetector(
+                    TapTarget(
                       onTap: () {
                         Navigator.push(
                           context,
@@ -391,9 +431,9 @@ class _BookingTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (booking.status == BookingStatusEnum.inTransit) ...[
+                    if (booking.status.isTrackable) ...[
                       SizedBox(width: 8),
-                      GestureDetector(
+                      TapTarget(
                         onTap: () => context.go(
                           '${AppConstants.routeTrack}?booking=${booking.id}',
                         ),
@@ -442,8 +482,11 @@ class _BookingTile extends StatelessWidget {
             ),
           ),
         )
-        .animate(delay: Duration(milliseconds: index * 50))
-        .fadeIn(duration: 300.ms)
-        .slideY(begin: 0.04);
+        .entrance(
+          context,
+          delay: Duration(milliseconds: index * 50),
+          duration: const Duration(milliseconds: 300),
+          slide: 0.04,
+        );
   }
 }

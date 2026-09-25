@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/utils/motion.dart';
 import '../../../core/constants/app_constants.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/driver_colors.dart';
 import '../../../core/widgets/glass.dart';
 
 /// Auth screen shell: the car-carrier photo on top, and a dark sheet with a
@@ -13,13 +13,15 @@ import '../../../core/widgets/glass.dart';
 class AuthSheetLayout extends StatelessWidget {
   /// Height of the sheet as a fraction of the screen, with the keyboard closed.
   final double sheetHeight;
-  final VoidCallback onBack;
+
+  /// Back action; no back button (and normal system back) when null.
+  final VoidCallback? onBack;
   final Widget child;
 
   const AuthSheetLayout({
     super.key,
     required this.sheetHeight,
-    required this.onBack,
+    this.onBack,
     required this.child,
   });
 
@@ -36,11 +38,13 @@ class AuthSheetLayout extends StatelessWidget {
     final topInset = MediaQuery.paddingOf(context).top;
     final heroHeight = 1 - sheetHeight + _heroOverlap;
 
+    final onBack = this.onBack;
+
     // The system back gesture/button does the same as the on-screen one.
     return PopScope(
-      canPop: false,
+      canPop: onBack == null,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) onBack();
+        if (!didPop) onBack?.call();
       },
       child: Scaffold(
         backgroundColor: context.colors.background,
@@ -97,15 +101,16 @@ class AuthSheetLayout extends StatelessWidget {
                 ),
               ],
             ),
-            Positioned(
-              top: topInset + 16,
-              left: 20,
-              child: GlassIconButton(
-                icon: Icons.chevron_left_rounded,
-                semanticLabel: 'Back',
-                onTap: onBack,
-              ),
-            ).motionAware(context).fadeIn(duration: 300.ms),
+            if (onBack != null)
+              Positioned(
+                top: topInset + 16,
+                left: 20,
+                child: GlassIconButton(
+                  icon: Icons.chevron_left_rounded,
+                  semanticLabel: 'Back',
+                  onTap: onBack,
+                ),
+              ).motionAware(context).fadeIn(duration: 300.ms),
           ],
         ),
       ),

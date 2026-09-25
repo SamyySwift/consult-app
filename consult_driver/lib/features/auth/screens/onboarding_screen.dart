@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/utils/motion.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/driver_colors.dart';
 import '../../../core/widgets/driver_button.dart';
+import '../../../core/widgets/glass.dart';
+import '../../../core/widgets/tap_target.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -48,14 +51,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: DriverColors.background,
-      body: SafeArea(
+      body: Stack(
+        children: [
+          const Positioned.fill(child: AuroraBackground()),
+          SafeArea(
         child: Column(
           children: [
             Align(
               alignment: Alignment.topRight,
-              child: TextButton(
-                onPressed: () => context.go(AppRoutes.login),
-                child: const Text('Skip'),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(0, 8, 20, 0),
+                child: TapTarget(
+                  onTap: () => context.go(AppRoutes.login),
+                  child: GlassPill(
+                    blur: true,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text(
+                      'Skip',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
               ),
             ),
 
@@ -75,8 +91,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   SmoothPageIndicator(
                     controller: _controller,
                     count: _pages.length,
-                    effect: const WormEffect(
-                      dotColor: DriverColors.border,
+                    effect: WormEffect(
+                      dotColor: Colors.white.withValues(alpha: 0.15),
                       activeDotColor: DriverColors.accent,
                       dotHeight: 8,
                       dotWidth: 8,
@@ -105,7 +121,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('Already a driver? ', style: TextStyle(color: DriverColors.textSecondary, fontSize: 14)),
+                      Text('Already a driver? ', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
                       TextButton(
                         onPressed: () => context.go(AppRoutes.login),
                         style: TextButton.styleFrom(
@@ -113,7 +129,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: const Text('Sign In', style: TextStyle(fontWeight: FontWeight.w700)),
+                        child: const Text(
+                          'Sign In',
+                          style: TextStyle(fontWeight: FontWeight.w700, color: DriverColors.accent),
+                        ),
                       ),
                     ],
                   ),
@@ -122,6 +141,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ],
         ),
+      ),
+        ],
       ),
     );
   }
@@ -147,16 +168,20 @@ class _OnboardingPage extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 130,
-            height: 130,
+          DecoratedBox(
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
-              border: Border.all(color: color.withValues(alpha: 0.3), width: 2),
+              boxShadow: [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 60, spreadRadius: 4)],
             ),
-            child: Icon(icon, size: 64, color: color),
-          ).animate().scale(duration: 500.ms, curve: Curves.elasticOut),
+            child: GlassContainer(
+              width: 140,
+              height: 140,
+              radius: 70,
+              blur: true,
+              tint: color,
+              child: Icon(icon, size: 62, color: color),
+            ),
+          ).motionAware(context).scale(duration: 500.ms, curve: Curves.elasticOut),
 
           const SizedBox(height: 40),
 
@@ -169,19 +194,19 @@ class _OnboardingPage extends StatelessWidget {
               color: DriverColors.textPrimary,
               height: 1.2,
             ),
-          ).animate(delay: 100.ms).fadeIn(duration: 400.ms).slideY(begin: 0.2),
+          ).motionAware(context, delay: 100.ms).fadeIn(duration: 400.ms).slideY(begin: 0.2),
 
           const SizedBox(height: 16),
 
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
-              color: DriverColors.textSecondary,
+              color: Colors.white.withValues(alpha: 0.6),
               height: 1.6,
             ),
-          ).animate(delay: 200.ms).fadeIn(duration: 400.ms),
+          ).motionAware(context, delay: 200.ms).fadeIn(duration: 400.ms),
         ],
       ),
     );

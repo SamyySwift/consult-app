@@ -49,24 +49,43 @@ final _router = GoRouter(
       path: AppRoutes.activeJob,
       builder: (context, state) => const ActiveJobScreen(),
     ),
-    ShellRoute(
-      builder: (context, state, child) => MainShell(child: child),
-      routes: [
-        GoRoute(
-          path: AppRoutes.dashboard,
-          builder: (context, state) => const DashboardScreen(),
+    // Each tab is its own branch so it keeps its scroll position and
+    // navigation stack while another tab is showing.
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) =>
+          MainShell(navigationShell: navigationShell),
+      branches: [
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppRoutes.dashboard,
+              builder: (context, state) => const DashboardScreen(),
+            ),
+          ],
         ),
-        GoRoute(
-          path: AppRoutes.jobBoard,
-          builder: (context, state) => const JobBoardScreen(),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppRoutes.jobBoard,
+              builder: (context, state) => const JobBoardScreen(),
+            ),
+          ],
         ),
-        GoRoute(
-          path: AppRoutes.earnings,
-          builder: (context, state) => const EarningsScreen(),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppRoutes.earnings,
+              builder: (context, state) => const EarningsScreen(),
+            ),
+          ],
         ),
-        GoRoute(
-          path: AppRoutes.profile,
-          builder: (context, state) => const ProfileScreen(),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppRoutes.profile,
+              builder: (context, state) => const ProfileScreen(),
+            ),
+          ],
         ),
       ],
     ),

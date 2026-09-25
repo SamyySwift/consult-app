@@ -312,9 +312,9 @@ class AppTheme {
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: colors.accent);
+            return GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: colors.accent);
           }
-          return GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w500, color: colors.textLight);
+          return GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: colors.textLight);
         }),
         elevation: 0,
         surfaceTintColor: Colors.transparent,

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../../core/utils/motion.dart';
 import '../providers/auth_provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/widgets/tap_target.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/glass.dart';
@@ -83,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   textAlign: TextAlign.center,
-                ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
+                ).motionAware(context).fadeIn(duration: 400.ms).slideY(begin: 0.1),
 
                 SizedBox(height: 8),
 
@@ -96,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         height: 1.5,
                       ),
                     )
-                    .animate(delay: 100.ms)
+                    .motionAware(context, delay: 100.ms)
                     .fadeIn(duration: 400.ms)
                     .slideY(begin: 0.1),
 
@@ -112,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: _pillRadius,
                       prefixIcon: Icon(Icons.mail_outline_rounded),
                     )
-                    .animate(delay: 200.ms)
+                    .motionAware(context, delay: 200.ms)
                     .fadeIn(duration: 400.ms)
                     .slideY(begin: 0.1),
 
@@ -140,7 +142,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     )
-                    .animate(delay: 300.ms)
+                    .motionAware(context, delay: 300.ms)
                     .fadeIn(duration: 400.ms)
                     .slideY(begin: 0.1),
 
@@ -148,7 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 Align(
                   alignment: Alignment.centerRight,
-                  child: GestureDetector(
+                  child: TapTarget(
                     onTap: () => context.push(AppConstants.routeForgotPassword),
                     child: Text(
                       'Forgot Password',
@@ -159,7 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                ).animate(delay: 350.ms).fadeIn(duration: 400.ms),
+                ).motionAware(context, delay: 350.ms).fadeIn(duration: 400.ms),
 
                 SizedBox(height: 28),
 
@@ -168,7 +170,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       isLoading: auth.isLoading,
                       onPressed: auth.isLoading ? null : _submit,
                     )
-                    .animate(delay: 400.ms)
+                    .motionAware(context, delay: 400.ms)
                     .fadeIn(duration: 400.ms)
                     .slideY(begin: 0.1),
 
@@ -184,7 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         fontSize: 14,
                       ),
                     ),
-                    GestureDetector(
+                    TapTarget(
                       onTap: () => context.go(AppConstants.routeRegister),
                       child: Text(
                         'Register',
@@ -196,7 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ],
-                ).animate(delay: 550.ms).fadeIn(duration: 400.ms),
+                ).motionAware(context, delay: 550.ms).fadeIn(duration: 400.ms),
               ],
             ),
           ),
