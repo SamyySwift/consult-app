@@ -6,7 +6,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
-import 'package:timeline_tile/timeline_tile.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../booking/providers/booking_provider.dart';
 import '../../booking/models/booking_model.dart';
@@ -310,47 +309,59 @@ class _TrackingContentState extends State<_TrackingContent> {
                 // The sheet only reports its extent once dragged, so never
                 // place the controls below its collapsed height.
                 final bottom = screenHeight * math.max(extent, sheetMin) + 12;
-                return Stack(
-                  children: [
-                    Positioned(
-                      right: 16,
-                      bottom: bottom,
-                      child: Column(
-                        children: [
-                          GlassIconButton(
-                            icon: _follow
-                                ? Icons.navigation_rounded
-                                : Icons.navigation_outlined,
-                            iconColor: _follow
-                                ? context.colors.accent
-                                : Colors.white,
-                            semanticLabel: 'Follow driver',
-                            onTap: _followDriver,
+                // Once the sheet covers most of the map, get out of the way
+                // of the header instead of riding up over it.
+                final hidden = extent > 0.55;
+                return IgnorePointer(
+                  ignoring: hidden,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 150),
+                    opacity: hidden ? 0 : 1,
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          right: 16,
+                          bottom: bottom,
+                          child: Column(
+                            children: [
+                              GlassIconButton(
+                                icon: _follow
+                                    ? Icons.navigation_rounded
+                                    : Icons.navigation_outlined,
+                                iconColor: _follow
+                                    ? context.colors.accent
+                                    : Colors.white,
+                                semanticLabel: 'Follow driver',
+                                onTap: _followDriver,
+                              ),
+                              SizedBox(height: 10),
+                              GlassIconButton(
+                                icon: Icons.zoom_out_map_rounded,
+                                semanticLabel: 'Show whole route',
+                                onTap: _showWholeRoute,
+                              ),
+                            ],
                           ),
-                          SizedBox(height: 10),
-                          GlassIconButton(
-                            icon: Icons.zoom_out_map_rounded,
-                            semanticLabel: 'Show whole route',
-                            onTap: _showWholeRoute,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Positioned(
-                      left: 16,
-                      bottom: bottom,
-                      child: Text(
-                        hasMapbox
-                            ? '© Mapbox © OpenStreetMap'
-                            : '© OpenStreetMap',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.white.withValues(alpha: 0.6),
-                          shadows: [Shadow(color: Colors.black, blurRadius: 4)],
                         ),
-                      ),
+                        Positioned(
+                          left: 16,
+                          bottom: bottom,
+                          child: Text(
+                            hasMapbox
+                                ? '© Mapbox © OpenStreetMap'
+                                : '© OpenStreetMap',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.white.withValues(alpha: 0.6),
+                              shadows: [
+                                Shadow(color: Colors.black, blurRadius: 4),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 );
               },
             ),
@@ -383,9 +394,8 @@ class _TrackingContentState extends State<_TrackingContent> {
                     ),
                   ),
                 ),
-                GlassContainer(
-                  radius: 24,
-                  padding: EdgeInsets.fromLTRB(18, 8, 18, 0),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(4, 8, 4, 0),
                   child: _StatusTimeline(status: booking.status),
                 ),
               ],
@@ -541,6 +551,13 @@ class _TrackingContentState extends State<_TrackingContent> {
   }
 
   Widget _bookingChips() {
+    // Several bookings can be for the same car, so repeated names also show
+    // the short booking reference to tell them apart.
+    final nameCounts = <String, int>{};
+    for (final b in widget.activeBookings) {
+      nameCounts.update(b.vehicle.displayName, (n) => n + 1, ifAbsent: () => 1);
+    }
+
     return SizedBox(
       height: 56,
       child: ListView.separated(
@@ -558,15 +575,40 @@ class _TrackingContentState extends State<_TrackingContent> {
               glow: isSelected,
               tint: isSelected ? context.colors.accent : null,
               padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              child: Text(
-                '#${shortRef(b.id)}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: isSelected
-                      ? Colors.white
-                      : Colors.white.withValues(alpha: 0.7),
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.directions_car_rounded,
+                    size: 15,
+                    color: isSelected
+                        ? context.colors.accentLight
+                        : Colors.white.withValues(alpha: 0.6),
+                  ),
+                  SizedBox(width: 6),
+                  Text.rich(
+                    TextSpan(
+                      text: b.vehicle.displayName,
+                      children: [
+                        if (nameCounts[b.vehicle.displayName]! > 1)
+                          TextSpan(
+                            text: '  #${shortRef(b.id)}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withValues(alpha: 0.45),
+                            ),
+                          ),
+                      ],
+                    ),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: isSelected
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
               ),
             ),
           );
@@ -967,148 +1009,314 @@ class _LiveProgressCard extends StatelessWidget {
   }
 }
 
+class _TimelineStep {
+  final BookingStatusEnum status;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  const _TimelineStep(this.status, this.icon, this.title, this.subtitle);
+}
+
+/// Journey steps as large icon capsules down the left: done steps are tinted
+/// and joined by a dashed line, the current step is a tall glowing pill, and
+/// upcoming steps are dim.
 class _StatusTimeline extends StatelessWidget {
   final BookingStatusEnum status;
-  _StatusTimeline({required this.status});
+  const _StatusTimeline({required this.status});
 
-  final _steps = [
-    (
+  static const _steps = [
+    _TimelineStep(
       BookingStatusEnum.confirmed,
+      Icons.event_available_rounded,
       'Booking Confirmed',
       'Your booking has been received',
     ),
-    (
+    _TimelineStep(
       BookingStatusEnum.pickedUp,
+      Icons.key_rounded,
       'Vehicle Picked Up',
       'Driver has collected your vehicle',
     ),
-    (BookingStatusEnum.inTransit, 'In Transit', 'Your vehicle is on its way'),
-    (BookingStatusEnum.outForDelivery, 'Out for Delivery', 'Almost there!'),
-    (
+    _TimelineStep(
+      BookingStatusEnum.inTransit,
+      Icons.local_shipping_rounded,
+      'In Transit',
+      'Your vehicle is on its way',
+    ),
+    _TimelineStep(
+      BookingStatusEnum.outForDelivery,
+      Icons.near_me_rounded,
+      'Out for Delivery',
+      'Almost there!',
+    ),
+    _TimelineStep(
       BookingStatusEnum.delivered,
+      Icons.verified_rounded,
       'Delivered',
       'Your vehicle has been delivered safely',
     ),
   ];
 
-  bool _isComplete(BookingStatusEnum step) {
-    final order = [
-      BookingStatusEnum.pending,
-      BookingStatusEnum.confirmed,
-      BookingStatusEnum.pickedUp,
-      BookingStatusEnum.inTransit,
-      BookingStatusEnum.outForDelivery,
-      BookingStatusEnum.delivered,
-    ];
-    return order.indexOf(status) >= order.indexOf(step);
-  }
-
-  bool _isCurrent(BookingStatusEnum step) {
-    return status == step;
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: _steps.asMap().entries.map((entry) {
-        final i = entry.key;
-        final (stepStatus, title, subtitle) = entry.value;
-        final isComplete = _isComplete(stepStatus);
-        final isCurrent = _isCurrent(stepStatus);
+    // Steps are in journey order, so a step is done once the booking's
+    // stage reaches it (stage 1 = confirmed … 5 = delivered).
+    final stage = status.stage;
+    final next = stage < _steps.length ? _steps[stage] : null;
 
-        return TimelineTile(
-          axis: TimelineAxis.vertical,
-          alignment: TimelineAlign.start,
-          isFirst: i == 0,
-          isLast: i == _steps.length - 1,
-          indicatorStyle: IndicatorStyle(
-            width: 28,
-            height: 28,
-            indicator: _TimelineDot(complete: isComplete, current: isCurrent),
+    return Column(
+      children: [
+        // Not confirmed yet: the hint leads into the first step.
+        if (stage == 0 && next != null) _NextUpRow(title: next.title),
+        for (var i = 0; i < _steps.length; i++) ...[
+          _TimelineRow(
+            step: _steps[i],
+            state: i + 1 < stage
+                ? _StepState.done
+                : i + 1 == stage
+                ? _StepState.current
+                : _StepState.upcoming,
+            // Dashed while the journey has passed this link, solid ahead.
+            connector: i == _steps.length - 1
+                ? null
+                : (i + 2 <= stage ? _Connector.dashed : _Connector.solid),
           ),
-          beforeLineStyle: LineStyle(
-            color: isComplete
-                ? context.colors.accent
-                : Colors.white.withValues(alpha: 0.10),
-            thickness: 2,
-          ),
-          afterLineStyle: LineStyle(
-            color: isComplete
-                ? context.colors.accent
-                : Colors.white.withValues(alpha: 0.10),
-            thickness: 2,
-          ),
-          endChild: Container(
-            padding: EdgeInsets.fromLTRB(14, 12, 14, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: isComplete || isCurrent
-                        ? Colors.white
-                        : Colors.white.withValues(alpha: 0.4),
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withValues(
-                      alpha: isComplete || isCurrent ? 0.6 : 0.3,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
+          if (next != null && i + 1 == stage) _NextUpRow(title: next.title),
+        ],
+      ],
     );
   }
 }
 
-/// Accent dot for a timeline step: a glowing check when done, a dim ring
-/// when upcoming.
-class _TimelineDot extends StatelessWidget {
-  final bool complete;
-  final bool current;
-  const _TimelineDot({required this.complete, required this.current});
+enum _StepState { done, current, upcoming }
+
+enum _Connector { dashed, solid }
+
+class _TimelineRow extends StatelessWidget {
+  static const _railWidth = 60.0;
+
+  final _TimelineStep step;
+  final _StepState state;
+  final _Connector? connector;
+
+  const _TimelineRow({
+    required this.step,
+    required this.state,
+    required this.connector,
+  });
 
   @override
   Widget build(BuildContext context) {
     final accent = context.colors.accent;
-    if (!complete) {
-      return Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withValues(alpha: 0.04),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.18),
-            width: 1.5,
-          ),
-        ),
-      );
-    }
-    return Container(
+    final isCurrent = state == _StepState.current;
+    final isDone = state == _StepState.done;
+
+    final Widget capsule = Container(
+      width: _railWidth,
+      height: isCurrent ? 92 : _railWidth,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: context.colors.accentGradient,
-        boxShadow: current
-            ? [BoxShadow(color: accent.withValues(alpha: 0.6), blurRadius: 14)]
+        borderRadius: BorderRadius.circular(_railWidth / 2),
+        gradient: isCurrent ? context.colors.accentGradient : null,
+        color: isCurrent
+            ? null
+            : isDone
+            ? accent.withValues(alpha: 0.16)
+            : Colors.white.withValues(alpha: 0.05),
+        border: isCurrent
+            ? null
+            : Border.all(
+                color: isDone
+                    ? accent.withValues(alpha: 0.45)
+                    : Colors.white.withValues(alpha: 0.10),
+              ),
+        boxShadow: isCurrent
+            ? [BoxShadow(color: accent.withValues(alpha: 0.45), blurRadius: 22)]
             : null,
       ),
       child: Icon(
-        current ? Icons.radio_button_checked : Icons.check_rounded,
-        size: current ? 14 : 16,
-        color: Colors.black,
+        step.icon,
+        size: 26,
+        color: isCurrent
+            ? Colors.black
+            : isDone
+            ? context.colors.accentLight
+            : Colors.white.withValues(alpha: 0.35),
+      ),
+    );
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: _railWidth,
+            child: Column(
+              children: [
+                capsule,
+                if (connector != null)
+                  Expanded(
+                    child: _ConnectorLine(
+                      dashed: connector == _Connector.dashed,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          SizedBox(width: 18),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(top: isCurrent ? 18 : 8, bottom: 38),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isCurrent ? 'Happening now' : step.subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                      color: isCurrent
+                          ? accent
+                          : Colors.white.withValues(alpha: isDone ? 0.5 : 0.3),
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    step.title,
+                    style: TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                      color: Colors.white.withValues(
+                        alpha: state == _StepState.upcoming ? 0.45 : 1,
+                      ),
+                    ),
+                  ),
+                  if (isCurrent) ...[
+                    SizedBox(height: 4),
+                    Text(
+                      step.subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
+}
+
+/// "Next up" hint sitting on the rail between the current and next step.
+class _NextUpRow extends StatelessWidget {
+  final String title;
+  const _NextUpRow({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: _TimelineRow._railWidth,
+            child: const _ConnectorLine(dashed: false),
+          ),
+          SizedBox(width: 18),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: 22),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.timer_outlined,
+                    size: 18,
+                    color: Colors.white.withValues(alpha: 0.5),
+                  ),
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: Text.rich(
+                      TextSpan(
+                        text: 'Next up: ',
+                        children: [
+                          TextSpan(
+                            text: title,
+                            style: TextStyle(
+                              color: context.colors.accent,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Vertical rail segment centred in the icon column.
+class _ConnectorLine extends StatelessWidget {
+  final bool dashed;
+  const _ConnectorLine({required this.dashed});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _RailPainter(
+        dashed: dashed,
+        color: dashed
+            ? context.colors.accent.withValues(alpha: 0.7)
+            : Colors.white.withValues(alpha: 0.12),
+      ),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+class _RailPainter extends CustomPainter {
+  final bool dashed;
+  final Color color;
+  _RailPainter({required this.dashed, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final x = size.width / 2;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = dashed ? 4 : 3
+      ..strokeCap = StrokeCap.round;
+    if (!dashed) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+      return;
+    }
+    const dash = 7.0;
+    const gap = 6.0;
+    for (var y = gap / 2; y < size.height; y += dash + gap) {
+      canvas.drawLine(
+        Offset(x, y),
+        Offset(x, math.min(y + dash, size.height)),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RailPainter old) =>
+      old.dashed != dashed || old.color != color;
 }
 
 class _EmptyTracking extends StatelessWidget {
