@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/widgets/glass.dart';
 import '../notifications/providers/notification_provider.dart';
 import '../notifications/widgets/in_app_notification_banner.dart';
 
@@ -53,59 +54,135 @@ class _MainShellState extends State<MainShell> {
 
     return Scaffold(
       backgroundColor: colors.background,
+      // Tabs scroll under the floating glass nav; each adds bottom padding
+      // from MediaQuery so its last item clears it.
+      extendBody: true,
       body: widget.child,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: context.colors.background,
-        ),
-        child: NavigationBar(
-          selectedIndex: idx,
-          backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          indicatorColor: Colors.transparent,
-          elevation: 0,
-          onDestinationSelected: (i) {
-            switch (i) {
-              case 0:
-                context.go(AppConstants.routeHome);
-              case 1:
-                context.go(AppConstants.routeBookings);
-              case 2:
-                context.go(AppConstants.routeTrack);
-              case 3:
-                context.go(AppConstants.routePayments);
-              case 4:
-                context.go(AppConstants.routeProfile);
-            }
-          },
-          destinations: [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined, color: colors.textLight),
-              selectedIcon: Icon(Icons.home_rounded, color: colors.accent),
-              label: 'Home',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.list_alt_outlined, color: colors.textLight),
-              selectedIcon: Icon(Icons.list_alt_rounded, color: colors.accent),
-              label: 'Bookings',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.my_location_outlined, color: colors.textLight),
-              selectedIcon: Icon(Icons.my_location_rounded, color: colors.accent),
-              label: 'Track',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.credit_card_outlined, color: colors.textLight),
-              selectedIcon: Icon(Icons.credit_card_rounded, color: colors.accent),
-              label: 'Payments',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded, color: colors.textLight),
-              selectedIcon: Icon(Icons.person_rounded, color: colors.accent),
-              label: 'Profile',
-            ),
-          ],
+      bottomNavigationBar: _GlassNavBar(
+        selectedIndex: idx,
+        onSelect: (i) {
+          switch (i) {
+            case 0:
+              context.go(AppConstants.routeHome);
+            case 1:
+              context.go(AppConstants.routeBookings);
+            case 2:
+              context.go(AppConstants.routeTrack);
+            case 3:
+              context.go(AppConstants.routePayments);
+            case 4:
+              context.go(AppConstants.routeProfile);
+          }
+        },
+      ),
+    );
+  }
+}
+
+class _NavItem {
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  const _NavItem(this.icon, this.selectedIcon, this.label);
+}
+
+/// Floating frosted-glass pill nav with a capsule that slides to the
+/// selected tab.
+class _GlassNavBar extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onSelect;
+
+  const _GlassNavBar({required this.selectedIndex, required this.onSelect});
+
+  static const _items = [
+    _NavItem(Icons.home_outlined, Icons.home_rounded, 'Home'),
+    _NavItem(Icons.list_alt_outlined, Icons.list_alt_rounded, 'Bookings'),
+    _NavItem(Icons.my_location_outlined, Icons.my_location_rounded, 'Track'),
+    _NavItem(Icons.credit_card_outlined, Icons.credit_card_rounded, 'Payments'),
+    _NavItem(Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+        child: GlassContainer(
+          radius: 36,
+          blur: true,
+          tint: Colors.white,
+          padding: const EdgeInsets.all(6),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final itemWidth = constraints.maxWidth / _items.length;
+              return SizedBox(
+                height: 60,
+                child: Stack(
+                  children: [
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 320),
+                      curve: Curves.easeOutCubic,
+                      left: itemWidth * selectedIndex,
+                      top: 0,
+                      bottom: 0,
+                      width: itemWidth,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        for (var i = 0; i < _items.length; i++)
+                          SizedBox(
+                            width: itemWidth,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => onSelect(i),
+                              child: Semantics(
+                                button: true,
+                                selected: i == selectedIndex,
+                                label: _items[i].label,
+                                excludeSemantics: true,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      i == selectedIndex ? _items[i].selectedIcon : _items[i].icon,
+                                      size: 22,
+                                      color: i == selectedIndex
+                                          ? colors.accent
+                                          : Colors.white.withValues(alpha: 0.6),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      _items[i].label,
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: i == selectedIndex
+                                            ? Colors.white
+                                            : Colors.white.withValues(alpha: 0.6),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

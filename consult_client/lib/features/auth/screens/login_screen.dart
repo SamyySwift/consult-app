@@ -22,6 +22,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
+  static const double _curveHeight = 70;
+  static const double _pillRadius = 30;
+  // Fractions of screen height.
+  static const double _sheetHeight = 0.62;
+  static const double _heroHeight = 0.55;
+  static const double _heroOverlap = _heroHeight - (1 - _sheetHeight);
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -56,20 +63,213 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
+        final screen = MediaQuery.sizeOf(context);
+        final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+        final bodyHeight = screen.height - keyboard;
+        final topInset = MediaQuery.paddingOf(context).top;
+
         return Scaffold(
           backgroundColor: context.colors.background,
           body: Stack(
             children: [
-              // Top hero image
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: MediaQuery.of(context).size.height * 0.55,
-                child: Image.network(
-                  'https://images.unsplash.com/photo-1512428559087-560fa5ceab42?q=80&w=3540&auto=format&fit=crop',
-                  fit: BoxFit.cover,
-                ),
+              Column(
+                children: [
+                  // Hero image, anchored to the top of the sheet so it slides
+                  // up with the form when the keyboard opens.
+                  Expanded(
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: -screen.height * _heroOverlap,
+                          height: screen.height * _heroHeight,
+                          child: Image.network(
+                            AppConstants.heroImageUrl,
+                            fit: BoxFit.cover,
+                            alignment: Alignment(0.15, 0),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Bottom sheet form with a curved top edge. It keeps its full
+                  // height until the keyboard eats into the empty space below
+                  // the form, then pushes the hero up.
+                  ClipPath(
+                    clipper: _CurvedTopClipper(curveHeight: _curveHeight),
+                    child: Container(
+                      color: context.colors.surface,
+                      constraints: BoxConstraints(
+                        minHeight: (screen.height * _sheetHeight - keyboard)
+                            .clamp(0, double.infinity),
+                        maxHeight: bodyHeight - topInset,
+                      ),
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(
+                          24,
+                          _curveHeight + 12,
+                          24,
+                          32,
+                        ),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text.rich(
+                                    TextSpan(
+                                      style: TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                      children: [
+                                        TextSpan(
+                                          text: 'Your Car. ',
+                                          style: TextStyle(
+                                            color: context.colors.accent,
+                                          ),
+                                        ),
+                                        TextSpan(text: 'Our Care.'),
+                                      ],
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  )
+                                  .animate()
+                                  .fadeIn(duration: 400.ms)
+                                  .slideY(begin: 0.1),
+
+                              SizedBox(height: 8),
+
+                              Text(
+                                    'Vetted carriers, live GPS tracking\nand fully insured transit.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: context.colors.textSecondary,
+                                      height: 1.5,
+                                    ),
+                                  )
+                                  .animate(delay: 100.ms)
+                                  .fadeIn(duration: 400.ms)
+                                  .slideY(begin: 0.1),
+
+                              SizedBox(height: 32),
+
+                              CustomTextField(
+                                    hint: 'Enter Your Email',
+                                    controller: _emailController,
+                                    validator: AppValidators.validateEmail,
+                                    keyboardType: TextInputType.emailAddress,
+                                    autofillHints: [AutofillHints.email],
+                                    textInputAction: TextInputAction.next,
+                                    borderRadius: _pillRadius,
+                                    prefixIcon: Icon(
+                                      Icons.mail_outline_rounded,
+                                    ),
+                                  )
+                                  .animate(delay: 200.ms)
+                                  .fadeIn(duration: 400.ms)
+                                  .slideY(begin: 0.1),
+
+                              SizedBox(height: 16),
+
+                              CustomTextField(
+                                    hint: 'Enter Your Password',
+                                    controller: _passwordController,
+                                    validator: AppValidators.validatePassword,
+                                    obscureText: _obscurePassword,
+                                    autofillHints: [AutofillHints.password],
+                                    textInputAction: TextInputAction.done,
+                                    onFieldSubmitted: (_) => _submit(),
+                                    borderRadius: _pillRadius,
+                                    prefixIcon: Icon(
+                                      Icons.lock_outline_rounded,
+                                    ),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility_off_outlined
+                                            : Icons.visibility_outlined,
+                                        color: context.colors.textLight,
+                                      ),
+                                      onPressed: () => setState(
+                                        () => _obscurePassword =
+                                            !_obscurePassword,
+                                      ),
+                                    ),
+                                  )
+                                  .animate(delay: 300.ms)
+                                  .fadeIn(duration: 400.ms)
+                                  .slideY(begin: 0.1),
+
+                              SizedBox(height: 12),
+
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: GestureDetector(
+                                  onTap: () => context.push(
+                                    AppConstants.routeForgotPassword,
+                                  ),
+                                  child: Text(
+                                    'Forgot Password',
+                                    style: TextStyle(
+                                      color: context.colors.accent,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ).animate(delay: 350.ms).fadeIn(duration: 400.ms),
+
+                              SizedBox(height: 28),
+
+                              CustomButton(
+                                    label: 'Login',
+                                    isLoading: auth.isLoading,
+                                    onPressed: auth.isLoading ? null : _submit,
+                                    borderRadius: _pillRadius,
+                                  )
+                                  .animate(delay: 400.ms)
+                                  .fadeIn(duration: 400.ms)
+                                  .slideY(begin: 0.1),
+
+                              SizedBox(height: 24),
+
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    "Don't have an account? ",
+                                    style: TextStyle(
+                                      color: context.colors.textSecondary,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () =>
+                                        context.go(AppConstants.routeRegister),
+                                    child: Text(
+                                      'Register',
+                                      style: TextStyle(
+                                        color: context.colors.accent,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ).animate(delay: 550.ms).fadeIn(duration: 400.ms),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
 
               // Back button to Register page
@@ -99,135 +299,32 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ).animate().fadeIn(duration: 300.ms),
-
-              // Bottom sheet form
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  height: MediaQuery.of(context).size.height * 0.55,
-                  decoration: BoxDecoration(
-                    color: context.colors.surface,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
-                  ),
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Log In',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
-
-                          SizedBox(height: 8),
-
-                          Text(
-                            'Log in to continue your\nseamless journey',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 15, 
-                              color: context.colors.textSecondary,
-                              height: 1.5,
-                            ),
-                          ).animate(delay: 100.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1),
-
-                          SizedBox(height: 40),
-
-                          CustomTextField(
-                            hint: 'Enter Your Email',
-                            controller: _emailController,
-                            validator: AppValidators.validateEmail,
-                            keyboardType: TextInputType.emailAddress,
-                            autofillHints: [AutofillHints.email],
-                            textInputAction: TextInputAction.next,
-                          ).animate(delay: 200.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1),
-
-                          SizedBox(height: 24),
-
-                          CustomTextField(
-                            hint: 'Enter Your Password',
-                            controller: _passwordController,
-                            validator: AppValidators.validatePassword,
-                            obscureText: _obscurePassword,
-                            autofillHints: [AutofillHints.password],
-                            textInputAction: TextInputAction.done,
-                            onFieldSubmitted: (_) => _submit(),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                                color: context.colors.textLight,
-                              ),
-                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                            ),
-                          ).animate(delay: 300.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1),
-
-                          SizedBox(height: 40),
-
-                          CustomButton(
-                            label: 'Login',
-                            isLoading: auth.isLoading,
-                            onPressed: auth.isLoading ? null : _submit,
-                          ).animate(delay: 400.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1),
-
-                          SizedBox(height: 20),
-
-                          GestureDetector(
-                            onTap: () => context.push(AppConstants.routeForgotPassword),
-                            child: Text(
-                              'Forgot Password',
-                              style: TextStyle(
-                                color: context.colors.textSecondary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ).animate(delay: 500.ms).fadeIn(duration: 400.ms),
-
-                          SizedBox(height: 16),
-
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                "Don't have an account? ",
-                                style: TextStyle(
-                                  color: context.colors.textSecondary,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: () => context.go(AppConstants.routeRegister),
-                                child: Text(
-                                  'Register',
-                                  style: TextStyle(
-                                    color: context.colors.primary,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ).animate(delay: 550.ms).fadeIn(duration: 400.ms),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         );
       },
     );
   }
+}
+
+/// Clips the top of the form sheet into a dome: low at both sides, peaking
+/// in the middle.
+class _CurvedTopClipper extends CustomClipper<Path> {
+  final double curveHeight;
+
+  const _CurvedTopClipper({required this.curveHeight});
+
+  @override
+  Path getClip(Size size) {
+    return Path()
+      ..moveTo(0, curveHeight)
+      ..quadraticBezierTo(size.width / 2, -curveHeight, size.width, curveHeight)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(_CurvedTopClipper oldClipper) =>
+      oldClipper.curveHeight != curveHeight;
 }

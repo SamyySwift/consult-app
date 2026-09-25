@@ -22,6 +22,7 @@ class CustomTextField extends StatelessWidget {
   final bool autofocus;
   final List<String>? autofillHints;
   final List<TextInputFormatter>? inputFormatters;
+  final double? borderRadius;
 
   const CustomTextField({
     super.key,
@@ -44,10 +45,18 @@ class CustomTextField extends StatelessWidget {
     this.autofocus = false,
     this.autofillHints,
     this.inputFormatters,
+    this.borderRadius,
   });
 
   @override
   Widget build(BuildContext context) {
+    OutlineInputBorder? radiusBorder(BorderSide side) => borderRadius == null
+        ? null
+        : OutlineInputBorder(
+            borderRadius: BorderRadius.circular(borderRadius!),
+            borderSide: side,
+          );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -88,6 +97,11 @@ class CustomTextField extends StatelessWidget {
             hintText: hint,
             prefixIcon: prefixIcon,
             suffixIcon: suffixIcon,
+            border: radiusBorder(BorderSide.none),
+            enabledBorder: radiusBorder(BorderSide.none),
+            focusedBorder: radiusBorder(BorderSide(color: context.colors.accent, width: 1.5)),
+            errorBorder: radiusBorder(BorderSide(color: context.colors.error, width: 1.5)),
+            focusedErrorBorder: radiusBorder(BorderSide(color: context.colors.error, width: 1.5)),
           ),
         ),
       ],

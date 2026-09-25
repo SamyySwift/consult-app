@@ -12,6 +12,7 @@ class CustomButton extends StatelessWidget {
   final Color? foregroundColor;
   final double? width;
   final double height;
+  final double borderRadius;
 
   const CustomButton({
     super.key,
@@ -24,6 +25,7 @@ class CustomButton extends StatelessWidget {
     this.foregroundColor,
     this.width,
     this.height = 54,
+    this.borderRadius = 14,
   });
 
   const CustomButton.outlined({
@@ -36,6 +38,7 @@ class CustomButton extends StatelessWidget {
     this.foregroundColor,
     this.width,
     this.height = 54,
+    this.borderRadius = 14,
   }) : isOutlined = true;
 
   @override
@@ -69,7 +72,7 @@ class CustomButton extends StatelessWidget {
           );
 
     final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(borderRadius),
       side: isOutlined ? BorderSide(color: context.colors.border, width: 1.5) : BorderSide.none,
     );
 
@@ -92,7 +95,7 @@ class CustomButton extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: onPressed != null && !isLoading ? context.colors.accentGradient : null,
                 color: onPressed == null || isLoading ? context.colors.border : null,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(borderRadius),
                 boxShadow: onPressed != null && !isLoading
                     ? [
                         BoxShadow(
@@ -109,7 +112,7 @@ class CustomButton extends StatelessWidget {
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
                   disabledBackgroundColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(borderRadius)),
                   padding: EdgeInsets.zero,
                   minimumSize: Size(width ?? double.infinity, height),
                 ),

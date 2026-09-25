@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/glass.dart';
 import '../models/notification_model.dart';
 import '../providers/notification_provider.dart';
 import '../widgets/notification_item_card.dart';
@@ -43,174 +44,127 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         }
 
         return Scaffold(
-          backgroundColor: colors.background,
-          appBar: AppBar(
-            backgroundColor: colors.background,
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                  color: Colors.white, size: 20),
-              onPressed: () => context.pop(),
-            ),
-            title: const Text(
-              'Notifications',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                letterSpacing: -0.3,
-              ),
-            ),
-            centerTitle: true,
-            actions: [
-              if (unread.isNotEmpty)
-                TextButton(
-                  onPressed: () => notifProv.markAllAsRead(),
-                  child: Text(
-                    'Mark all read',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+          backgroundColor: Colors.black,
+          body: Stack(
+            children: [
+              const Positioned.fill(child: AuroraBackground()),
+              Column(
+                children: [
+                  GlassPageHeader(
+                    title: 'Notifications',
+                    showBack: true,
+                    onBack: () => context.pop(),
+                    actions: [
+                      PopupMenuButton<String>(
+                        tooltip: 'More',
+                        color: const Color(0xF0151515),
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          side: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.12),
+                          ),
+                        ),
+                        onSelected: (val) {
+                          if (val == 'mark_all') {
+                            notifProv.markAllAsRead();
+                          } else if (val == 'clear_all') {
+                            _showClearAllDialog(context, notifProv);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'mark_all',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.done_all_rounded,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  'Mark all as read',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'clear_all',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.delete_sweep_rounded,
+                                  size: 18,
+                                  color: Colors.redAccent,
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  'Clear all notifications',
+                                  style: TextStyle(
+                                    color: Colors.redAccent,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        child: const GlassIconButton(
+                          icon: Icons.more_horiz_rounded,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Expanded(
+                    child: RefreshIndicator(
+                      backgroundColor: colors.surface,
                       color: colors.accent,
-                    ),
-                  ),
-                ),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert_rounded,
-                    color: Colors.white70, size: 22),
-                color: colors.surface,
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: colors.border.withValues(alpha: 0.5)),
-                ),
-                onSelected: (val) {
-                  if (val == 'mark_all') {
-                    notifProv.markAllAsRead();
-                  } else if (val == 'clear_all') {
-                    _showClearAllDialog(context, notifProv);
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'mark_all',
-                    child: Row(
-                      children: [
-                        Icon(Icons.done_all_rounded,
-                            size: 18, color: Colors.white),
-                        SizedBox(width: 10),
-                        Text('Mark all as read',
-                            style: TextStyle(color: Colors.white, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'clear_all',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_sweep_rounded,
-                            size: 18, color: Colors.redAccent),
-                        SizedBox(width: 10),
-                        Text('Clear all notifications',
-                            style:
-                                TextStyle(color: Colors.redAccent, fontSize: 13)),
-                      ],
+                      onRefresh: () => notifProv.fetchNotifications(),
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 18, 16, 4),
+                            child: GlassSegmentedControl(
+                              labels: [
+                                'All (${all.length})',
+                                'Transit (${transit.length})',
+                                'Unread (${unread.length})',
+                              ],
+                              selectedIndex: _selectedFilter.index,
+                              onChanged: (i) => setState(
+                                () => _selectedFilter =
+                                    NotificationFilter.values[i],
+                              ),
+                            ),
+                          ),
+
+                          // List or Empty
+                          Expanded(
+                            child: notifProv.isLoading && all.isEmpty
+                                ? const Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                    ),
+                                  )
+                                : filteredList.isEmpty
+                                ? _buildEmptyState()
+                                : _buildGroupedNotificationList(filteredList),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 8),
             ],
-          ),
-          body: RefreshIndicator(
-            backgroundColor: colors.surface,
-            color: colors.accent,
-            onRefresh: () => notifProv.fetchNotifications(),
-            child: Column(
-              children: [
-                // Filter Tabs Bar
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Row(
-                    children: [
-                      _buildFilterChip(
-                        label: 'All (${all.length})',
-                        isSelected: _selectedFilter == NotificationFilter.all,
-                        onTap: () => setState(
-                            () => _selectedFilter = NotificationFilter.all),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(
-                        label: 'Transit (${transit.length})',
-                        isSelected:
-                            _selectedFilter == NotificationFilter.transit,
-                        onTap: () => setState(
-                            () => _selectedFilter = NotificationFilter.transit),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(
-                        label: 'Unread (${unread.length})',
-                        isSelected:
-                            _selectedFilter == NotificationFilter.unread,
-                        onTap: () => setState(
-                            () => _selectedFilter = NotificationFilter.unread),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const Divider(height: 1, color: Color(0xFF222733)),
-
-                // List or Empty
-                Expanded(
-                  child: notifProv.isLoading && all.isEmpty
-                      ? const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2.5),
-                        )
-                      : filteredList.isEmpty
-                          ? _buildEmptyState(colors)
-                          : _buildGroupedNotificationList(filteredList),
-                ),
-              ],
-            ),
           ),
         );
       },
-    );
-  }
-
-  Widget _buildFilterChip({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    final colors = context.colors;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? colors.accent.withValues(alpha: 0.15)
-              : colors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? colors.accent : colors.border,
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            color: isSelected ? colors.accent : colors.textSecondary,
-          ),
-        ),
-      ),
     );
   }
 
@@ -233,45 +187,50 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        MediaQuery.paddingOf(context).bottom + 16,
+      ),
       children: [
         if (todayList.isNotEmpty) ...[
           _buildSectionHeader('TODAY'),
-          ...todayList.asMap().entries.map((entry) => NotificationItemCard(
-                notification: entry.value,
-              )
-                  .animate()
-                  .fadeIn(
-                    duration: 300.ms,
-                    delay: Duration(milliseconds: entry.key * 40),
-                  )
-                  .slideY(begin: 0.08)),
+          ...todayList.asMap().entries.map(
+            (entry) => NotificationItemCard(notification: entry.value)
+                .animate()
+                .fadeIn(
+                  duration: 300.ms,
+                  delay: Duration(milliseconds: entry.key * 40),
+                )
+                .slideY(begin: 0.08),
+          ),
           const SizedBox(height: 12),
         ],
         if (yesterdayList.isNotEmpty) ...[
           _buildSectionHeader('YESTERDAY'),
-          ...yesterdayList.asMap().entries.map((entry) => NotificationItemCard(
-                notification: entry.value,
-              )
-                  .animate()
-                  .fadeIn(
-                    duration: 300.ms,
-                    delay: Duration(milliseconds: entry.key * 40),
-                  )
-                  .slideY(begin: 0.08)),
+          ...yesterdayList.asMap().entries.map(
+            (entry) => NotificationItemCard(notification: entry.value)
+                .animate()
+                .fadeIn(
+                  duration: 300.ms,
+                  delay: Duration(milliseconds: entry.key * 40),
+                )
+                .slideY(begin: 0.08),
+          ),
           const SizedBox(height: 12),
         ],
         if (earlierList.isNotEmpty) ...[
           _buildSectionHeader('EARLIER'),
-          ...earlierList.asMap().entries.map((entry) => NotificationItemCard(
-                notification: entry.value,
-              )
-                  .animate()
-                  .fadeIn(
-                    duration: 300.ms,
-                    delay: Duration(milliseconds: entry.key * 40),
-                  )
-                  .slideY(begin: 0.08)),
+          ...earlierList.asMap().entries.map(
+            (entry) => NotificationItemCard(notification: entry.value)
+                .animate()
+                .fadeIn(
+                  duration: 300.ms,
+                  delay: Duration(milliseconds: entry.key * 40),
+                )
+                .slideY(begin: 0.08),
+          ),
         ],
       ],
     );
@@ -285,76 +244,49 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: context.colors.textSecondary,
-          letterSpacing: 1.0,
+          color: Colors.white.withValues(alpha: 0.45),
+          letterSpacing: 1.2,
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState(AppThemeColors colors) {
+  Widget _buildEmptyState() {
     return Center(
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: colors.surface,
-                shape: BoxShape.circle,
-                border: Border.all(color: colors.border),
-              ),
-              child: Icon(
-                Icons.notifications_none_rounded,
-                size: 38,
-                color: colors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'No Notifications',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _selectedFilter == NotificationFilter.unread
-                  ? "You're all caught up! There are no unread notifications."
-                  : 'You will receive real-time updates for every milestone of your vehicle shipment here.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: colors.textSecondary,
-                height: 1.4,
-              ),
-            ),
-          ],
+        padding: const EdgeInsets.all(24),
+        child: GlassEmptyState(
+          icon: Icons.notifications_none_rounded,
+          title: 'No Notifications',
+          subtitle: _selectedFilter == NotificationFilter.unread
+              ? "You're all caught up! There are no unread notifications."
+              : 'You will receive real-time updates for every milestone of your vehicle shipment here.',
         ).animate().fadeIn(duration: 400.ms),
       ),
     );
   }
 
   void _showClearAllDialog(
-      BuildContext context, NotificationProvider provider) {
+    BuildContext context,
+    NotificationProvider provider,
+  ) {
     final colors = context.colors;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: colors.surface,
+        backgroundColor: const Color(0xF0151515),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-          side: BorderSide(color: colors.border),
+          borderRadius: BorderRadius.circular(28),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
         ),
         title: const Text(
           'Clear all notifications?',
-          style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         content: Text(
           'This will remove all notification history for your account.',

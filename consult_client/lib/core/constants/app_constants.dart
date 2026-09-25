@@ -7,6 +7,10 @@ class AppConstants {
   static const String appName = 'Carpital Consult';
   static const String appTagline = 'Your vehicle, safely delivered.';
 
+  /// Car-carrier hero photo used behind the login and home screens.
+  static const String heroImageUrl =
+      'https://images.unsplash.com/photo-1742940796395-b2a614941353?q=80&w=2000&auto=format&fit=crop';
+
   // Routes
   static const String routeSplash = '/';
   static const String routeOnboarding = '/onboarding';

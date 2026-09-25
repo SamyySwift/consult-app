@@ -82,9 +82,10 @@ class _InAppNotificationWidgetState extends State<_InAppNotificationWidget>
     _slideAnim = Tween<double>(begin: -1.0, end: 0.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
     );
-    _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
-    );
+    _fadeAnim = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
 
     _animController.forward();
   }
@@ -110,10 +111,7 @@ class _InAppNotificationWidgetState extends State<_InAppNotificationWidget>
       builder: (context, child) {
         return Transform.translate(
           offset: Offset(0, _slideAnim.value * 80),
-          child: Opacity(
-            opacity: _fadeAnim.value,
-            child: child,
-          ),
+          child: Opacity(opacity: _fadeAnim.value, child: child),
         );
       },
       child: GestureDetector(
@@ -153,10 +151,7 @@ class _InAppNotificationWidgetState extends State<_InAppNotificationWidget>
                 decoration: BoxDecoration(
                   color: accentColor.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: accentColor,
-                    width: 1.5,
-                  ),
+                  border: Border.all(color: accentColor, width: 1.5),
                 ),
                 child: Icon(
                   widget.notification.iconData,
@@ -207,8 +202,11 @@ class _InAppNotificationWidgetState extends State<_InAppNotificationWidget>
               ),
               const SizedBox(width: 8),
               IconButton(
-                icon: const Icon(Icons.close_rounded,
-                    size: 18, color: Colors.white60),
+                icon: const Icon(
+                  Icons.close_rounded,
+                  size: 18,
+                  color: Colors.white60,
+                ),
                 onPressed: _dismissWithAnim,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),

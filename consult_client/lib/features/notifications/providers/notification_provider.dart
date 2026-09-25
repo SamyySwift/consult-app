@@ -74,8 +74,10 @@ class NotificationProvider extends ChangeNotifier {
           .order('created_at', ascending: false);
 
       _notifications = (data as List)
-          .map((json) =>
-              NotificationModel.fromSupabaseMap(json as Map<String, dynamic>))
+          .map(
+            (json) =>
+                NotificationModel.fromSupabaseMap(json as Map<String, dynamic>),
+          )
           .toList();
     } catch (e) {
       debugPrint('Error fetching notifications from Supabase: $e');
@@ -105,22 +107,23 @@ class NotificationProvider extends ChangeNotifier {
             final newRec = payload.newRecord;
             if (payload.eventType == PostgresChangeEvent.insert &&
                 newRec.isNotEmpty) {
-              final newNotification =
-                  NotificationModel.fromSupabaseMap(newRec);
-              
+              final newNotification = NotificationModel.fromSupabaseMap(newRec);
+
               // Avoid duplicates
               _notifications.removeWhere((n) => n.id == newNotification.id);
               _notifications.insert(0, newNotification);
-              
+
               // Broadcast for in-app floating banner
               _newNotificationStreamController.add(newNotification);
               notifyListeners();
             } else if (payload.eventType == PostgresChangeEvent.update &&
                 newRec.isNotEmpty) {
-              final updatedNotification =
-                  NotificationModel.fromSupabaseMap(newRec);
-              final index = _notifications
-                  .indexWhere((n) => n.id == updatedNotification.id);
+              final updatedNotification = NotificationModel.fromSupabaseMap(
+                newRec,
+              );
+              final index = _notifications.indexWhere(
+                (n) => n.id == updatedNotification.id,
+              );
               if (index >= 0) {
                 _notifications[index] = updatedNotification;
               } else {
@@ -169,8 +172,9 @@ class NotificationProvider extends ChangeNotifier {
     final hasUnread = _notifications.any((n) => !n.isRead);
     if (!hasUnread) return;
 
-    _notifications =
-        _notifications.map((n) => n.copyWith(isRead: true)).toList();
+    _notifications = _notifications
+        .map((n) => n.copyWith(isRead: true))
+        .toList();
     notifyListeners();
 
     try {
@@ -189,10 +193,7 @@ class NotificationProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _supabase
-          .from('notifications')
-          .delete()
-          .eq('id', notificationId);
+      await _supabase.from('notifications').delete().eq('id', notificationId);
     } catch (e) {
       debugPrint('Error deleting notification: $e');
     }
@@ -204,10 +205,7 @@ class NotificationProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _supabase
-          .from('notifications')
-          .delete()
-          .eq('user_id', _currentUid);
+      await _supabase.from('notifications').delete().eq('user_id', _currentUid);
     } catch (e) {
       debugPrint('Error clearing all notifications: $e');
     }

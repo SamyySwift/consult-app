@@ -80,3 +80,29 @@ class _StatusConfig {
   final Color dotColor;
   _StatusConfig(this.label, this.bgColor, this.dotColor);
 }
+
+extension BookingStatusStage on BookingStatusEnum {
+  /// Number of steps in a shipment's journey (Confirmed → Delivered).
+  static const int stageCount = 5;
+
+  /// How many journey steps are done: 0 for pending or cancelled, 5 once
+  /// delivered.
+  int get stage => switch (this) {
+        BookingStatusEnum.pending || BookingStatusEnum.cancelled => 0,
+        BookingStatusEnum.confirmed => 1,
+        BookingStatusEnum.pickedUp => 2,
+        BookingStatusEnum.inTransit => 3,
+        BookingStatusEnum.outForDelivery => 4,
+        BookingStatusEnum.delivered => 5,
+      };
+
+  String get label => switch (this) {
+        BookingStatusEnum.pending => 'Pending',
+        BookingStatusEnum.confirmed => 'Confirmed',
+        BookingStatusEnum.pickedUp => 'Picked Up',
+        BookingStatusEnum.inTransit => 'In Transit',
+        BookingStatusEnum.outForDelivery => 'Out for Delivery',
+        BookingStatusEnum.delivered => 'Delivered',
+        BookingStatusEnum.cancelled => 'Cancelled',
+      };
+}
