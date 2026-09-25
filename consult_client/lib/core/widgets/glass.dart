@@ -49,10 +49,7 @@ class GlassContainer extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            fill.withValues(alpha: 0.10),
-            fill.withValues(alpha: 0.03),
-          ],
+          colors: [fill.withValues(alpha: 0.10), fill.withValues(alpha: 0.03)],
         ),
       ),
       child: child,
@@ -284,7 +281,10 @@ class AuroraBackground extends StatelessWidget {
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: RadialGradient(
-                colors: [accent.withValues(alpha: 0.14), accent.withValues(alpha: 0)],
+                colors: [
+                  accent.withValues(alpha: 0.14),
+                  accent.withValues(alpha: 0),
+                ],
               ),
             ),
           ),
@@ -325,10 +325,18 @@ class GlassIconButton extends StatelessWidget {
           isLabelVisible: badgeCount > 0,
           label: Text(
             badgeCount > 99 ? '99+' : badgeCount.toString(),
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
           ),
           backgroundColor: context.colors.accent,
-          child: Icon(icon, color: iconColor ?? Colors.white, size: size * 0.46),
+          child: Icon(
+            icon,
+            color: iconColor ?? Colors.white,
+            size: size * 0.46,
+          ),
         ),
       ),
     );
@@ -422,7 +430,10 @@ class GlassPageHeader extends StatelessWidget {
                 ),
               ),
             ),
-            if (spacedActions.isEmpty) const SizedBox(width: 46) else ...spacedActions,
+            if (spacedActions.isEmpty)
+              const SizedBox(width: 46)
+            else
+              ...spacedActions,
           ],
         ),
       ),
@@ -488,8 +499,12 @@ class GlassSegmentedControl extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 13,
-                                  fontWeight: i == selectedIndex ? FontWeight.w700 : FontWeight.w500,
-                                  color: i == selectedIndex ? Colors.white : Colors.white.withValues(alpha: 0.55),
+                                  fontWeight: i == selectedIndex
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: i == selectedIndex
+                                      ? Colors.white
+                                      : Colors.white.withValues(alpha: 0.55),
                                 ),
                               ),
                             ),
@@ -548,7 +563,12 @@ class StatPillData {
   /// glowing rim.
   final double? progress;
 
-  const StatPillData({required this.icon, required this.value, required this.label, this.progress});
+  const StatPillData({
+    required this.icon,
+    required this.value,
+    required this.label,
+    this.progress,
+  });
 }
 
 /// Glowing glass pill with an icon and a value, labelled underneath.
@@ -575,7 +595,11 @@ class GlassStatPill extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(
                   data.value,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
               ],
             ),
@@ -604,7 +628,12 @@ class BracketedStats extends StatelessWidget {
   final String value;
   final List<StatPillData> pills;
 
-  const BracketedStats({super.key, required this.label, required this.value, required this.pills});
+  const BracketedStats({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.pills,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -628,7 +657,9 @@ class BracketedStats extends StatelessWidget {
         const SizedBox(height: 6),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [for (final pill in pills) Expanded(child: GlassStatPill(pill))],
+          children: [
+            for (final pill in pills) Expanded(child: GlassStatPill(pill)),
+          ],
         ),
       ],
     );
@@ -682,126 +713,18 @@ class _BracketPainter extends CustomPainter {
   bool shouldRepaint(_BracketPainter old) => old.count != count;
 }
 
-/// Domed gradient arc with a value and label in the middle.
-class ArcGauge extends StatelessWidget {
-  final double progress;
-  final String value;
-  final String label;
-  final double width;
-
-  const ArcGauge({
-    super.key,
-    required this.progress,
-    required this.value,
-    required this.label,
-    this.width = 240,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      height: width * 0.7,
-      child: CustomPaint(
-        painter: _ArcPainter(
-          progress: progress.clamp(0.0, 1.0),
-          accent: context.colors.accent,
-          accentLight: context.colors.accentLight,
-        ),
-        child: Align(
-          alignment: const Alignment(0, 0.2),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              GradientNumber(value, fontSize: 52),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white.withValues(alpha: 0.7),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ArcPainter extends CustomPainter {
-  final double progress;
-  final Color accent;
-  final Color accentLight;
-
-  _ArcPainter({required this.progress, required this.accent, required this.accentLight});
-
-  // A 220° dome centred on the top of the circle.
-  static const _sweep = 220 * math.pi / 180;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const stroke = 10.0;
-    final radius = size.width / 2 - stroke;
-    final center = Offset(size.width / 2, stroke + radius);
-    final arcRect = Rect.fromCircle(center: center, radius: radius);
-    // Canvas angles run clockwise from 3 o'clock; centre the sweep on 12.
-    const start = -math.pi / 2 - _sweep / 2;
-
-    canvas.drawArc(
-      arcRect,
-      start,
-      _sweep,
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke
-        ..strokeCap = StrokeCap.round
-        ..color = Colors.white.withValues(alpha: 0.08),
-    );
-
-    if (progress <= 0) return;
-
-    final shader = LinearGradient(colors: [accentLight, accent]).createShader(arcRect);
-    canvas.drawArc(
-      arcRect,
-      start,
-      _sweep * progress,
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke + 4
-        ..strokeCap = StrokeCap.round
-        ..color = accentLight.withValues(alpha: 0.35)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
-    );
-    canvas.drawArc(
-      arcRect,
-      start,
-      _sweep * progress,
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke
-        ..strokeCap = StrokeCap.round
-        ..shader = shader,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_ArcPainter old) =>
-      old.progress != progress || old.accent != accent || old.accentLight != accentLight;
-}
-
 /// Row of rounded segments, the first [filled] of them lit in [color].
 class SegmentProgressBar extends StatelessWidget {
   final int total;
   final int filled;
   final Color? color;
 
-  const SegmentProgressBar({super.key, required this.total, required this.filled, this.color});
+  const SegmentProgressBar({
+    super.key,
+    required this.total,
+    required this.filled,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -816,7 +739,14 @@ class SegmentProgressBar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: i < filled ? lit : Colors.white.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(3),
-                boxShadow: i < filled ? [BoxShadow(color: lit.withValues(alpha: 0.35), blurRadius: 6)] : null,
+                boxShadow: i < filled
+                    ? [
+                        BoxShadow(
+                          color: lit.withValues(alpha: 0.35),
+                          blurRadius: 6,
+                        ),
+                      ]
+                    : null,
               ),
             ),
           ),
@@ -861,13 +791,21 @@ class GlassEmptyState extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.6), height: 1.4),
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withValues(alpha: 0.6),
+              height: 1.4,
+            ),
           ),
           if (action != null) ...[const SizedBox(height: 20), action!],
         ],
@@ -884,7 +822,13 @@ class GlassPillButton extends StatelessWidget {
   final VoidCallback onTap;
   final Color? color;
 
-  const GlassPillButton({super.key, required this.icon, required this.label, required this.onTap, this.color});
+  const GlassPillButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -902,10 +846,18 @@ class GlassPillButton extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 label,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: color ?? Colors.white),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: color ?? Colors.white,
+                ),
               ),
               const SizedBox(width: 4),
-              Icon(Icons.chevron_right_rounded, size: 20, color: Colors.white.withValues(alpha: 0.7)),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
             ],
           ),
         ),
@@ -950,7 +902,11 @@ class GlowButton extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
               boxShadow: [
-                BoxShadow(color: accent.withValues(alpha: 0.18), blurRadius: 24, offset: const Offset(0, 8)),
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.18),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
               ],
             ),
             child: GlassContainer(
@@ -979,7 +935,11 @@ class GlowButton extends StatelessWidget {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           stops: [0.15, 0.7, 1],
-                          colors: [Colors.transparent, Color(0x80FFFFFF), Colors.white],
+                          colors: [
+                            Colors.transparent,
+                            Color(0x80FFFFFF),
+                            Colors.white,
+                          ],
                         ).createShader(rect),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
@@ -1001,7 +961,10 @@ class GlowButton extends StatelessWidget {
                             ? const SizedBox(
                                 width: 22,
                                 height: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
                               )
                             : Text(
                                 label,

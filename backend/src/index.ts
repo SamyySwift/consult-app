@@ -10,6 +10,7 @@ import { driverRouter } from './routes/driver';
 import { adminRouter } from './routes/admin';
 import { uploadRouter } from './routes/upload';
 import { filesRouter } from './routes/files';
+import { mapsRouter } from './routes/maps';
 
 dotenv.config();
 
@@ -45,6 +46,7 @@ app.use('/api/driver', driverRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/files', filesRouter);
+app.use('/api/maps', mapsRouter);
 
 async function startServer() {
   try {

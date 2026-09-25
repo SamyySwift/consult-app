@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,7 @@ import '../../booking/providers/booking_provider.dart';
 import '../../booking/models/booking_model.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/network/route_service.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/glass.dart';
 import '../../../core/widgets/status_badge.dart';
@@ -89,426 +92,641 @@ class _TrackingContent extends StatefulWidget {
 }
 
 class _TrackingContentState extends State<_TrackingContent> {
+  static const _sheetMax = 0.88;
+
   final MapController _mapController = MapController();
+
+  /// Sheet height as a fraction of the screen, tracked separately so dragging
+  /// the sheet only rebuilds the controls riding above it, not the map.
+  final ValueNotifier<double> _sheetExtent = ValueNotifier(0.3);
+
+  /// Collapsed sheet height, set each build from the screen and nav size.
+  double _sheetMin = 0.3;
+
+  bool _mapReady = false;
+
+  /// Keep the camera on the driver as live positions arrive. Turned off as
+  /// soon as the user pans the map themselves.
+  bool _follow = true;
+
+  RoadRoute? _route;
+
+  BookingModel get _booking => widget.booking;
+  LatLng get _pickup => LatLng(_booking.pickup.lat, _booking.pickup.lng);
+  LatLng get _dropoff => LatLng(_booking.dropoff.lat, _booking.dropoff.lng);
+  LatLng? get _driver =>
+      (_booking.driverLat != null && _booking.driverLng != null)
+      ? LatLng(_booking.driverLat!, _booking.driverLng!)
+      : null;
+
+  /// Picked up or later: the vehicle is on the pickup → drop-off leg.
+  bool get _afterPickup => _booking.status.stage >= 2;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRoute();
+  }
+
+  @override
+  void dispose() {
+    _sheetExtent.dispose();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(covariant _TrackingContent oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    final oldLat = oldWidget.booking.driverLat;
-    final oldLng = oldWidget.booking.driverLng;
-    final newLat = widget.booking.driverLat;
-    final newLng = widget.booking.driverLng;
-
     if (oldWidget.booking.id != widget.booking.id) {
-      // Switched to another booking: jump to its driver, or its route midpoint
-      final b = widget.booking;
-      if (newLat != null && newLng != null) {
-        _mapController.move(LatLng(newLat, newLng), 14.0);
-      } else {
-        _mapController.move(
-          LatLng(
-            (b.pickup.lat + b.dropoff.lat) / 2,
-            (b.pickup.lng + b.dropoff.lng) / 2,
-          ),
-          6.0,
-        );
-      }
+      setState(() {
+        _route = null;
+        _follow = true;
+      });
+      _loadRoute();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fitAll());
       return;
     }
 
-    if (newLat != null && newLng != null) {
-      if (oldLat != newLat || oldLng != newLng) {
-        // Safely move map if driver location changed
-        _mapController.move(LatLng(newLat, newLng), _mapController.camera.zoom);
-      }
+    final driver = _driver;
+    final moved =
+        oldWidget.booking.driverLat != widget.booking.driverLat ||
+        oldWidget.booking.driverLng != widget.booking.driverLng;
+    if (moved && driver != null && _follow && _mapReady) {
+      _mapController.move(driver, _mapController.camera.zoom);
     }
+  }
+
+  Future<void> _loadRoute() async {
+    final bookingId = _booking.id;
+    final route = await RouteService.instance.fetch(_pickup, _dropoff);
+    if (!mounted || _booking.id != bookingId || route == null) return;
+    setState(() => _route = route);
+    if (!_follow || _driver == null) _fitAll();
+  }
+
+  /// The part of the map not covered by the header on top or the sheet and
+  /// floating controls at the bottom.
+  EdgeInsets _visibleArea() {
+    final size = MediaQuery.sizeOf(context);
+    final top =
+        MediaQuery.paddingOf(context).top +
+        130 +
+        (widget.activeBookings.length > 1 ? 56 : 0);
+    final bottom = size.height * math.max(_sheetExtent.value, _sheetMin) + 80;
+    return EdgeInsets.fromLTRB(40, top, 40, bottom);
+  }
+
+  void _fitAll() {
+    if (!_mapReady) return;
+    final driver = _driver;
+    _mapController.fitCamera(
+      CameraFit.coordinates(
+        coordinates: [_pickup, _dropoff, ?driver, ...?_route?.points],
+        padding: _visibleArea(),
+        maxZoom: 15,
+      ),
+    );
+  }
+
+  void _showWholeRoute() {
+    setState(() => _follow = false);
+    _fitAll();
+  }
+
+  void _followDriver() {
+    final driver = _driver;
+    if (driver == null) {
+      _fitAll();
+      return;
+    }
+    setState(() => _follow = true);
+    _mapController.move(driver, math.max(_mapController.camera.zoom, 13));
   }
 
   @override
   Widget build(BuildContext context) {
-    final booking = widget.booking;
-    final activeBookings = widget.activeBookings;
-    final onSelectBooking = widget.onSelectBooking;
+    final booking = _booking;
+    final driver = _driver;
+    final route = _route;
+    final routeIndex = (route != null && driver != null)
+        ? route.nearestIndex(driver)
+        : null;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    // Keep at least the ETA card visible above the floating nav bar.
+    final sheetMin = _sheetMin = math
+        .max(0.3, (MediaQuery.paddingOf(context).bottom + 150) / screenHeight)
+        .clamp(0.3, 0.5);
+    final multiple = widget.activeBookings.length > 1;
+    final hasMapbox = AppConstants.mapboxToken != null;
 
-    final pickupLatLng = LatLng(booking.pickup.lat, booking.pickup.lng);
-    final dropoffLatLng = LatLng(booking.dropoff.lat, booking.dropoff.lng);
-
-    // Use live driver position if available, else fallback to midway
-    final currentLatLng =
-        (booking.driverLat != null && booking.driverLng != null)
-        ? LatLng(booking.driverLat!, booking.driverLng!)
-        : LatLng(
-            (booking.pickup.lat + booking.dropoff.lat) / 2,
-            (booking.pickup.lng + booking.dropoff.lng) / 2,
-          );
-
-    void recenter() {
-      if (booking.driverLat != null && booking.driverLng != null) {
-        _mapController.move(
-          LatLng(booking.driverLat!, booking.driverLng!),
-          14.0,
-        );
-      } else {
-        _mapController.move(currentLatLng, 6.0);
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Map centered on vehicle'),
-          backgroundColor: context.colors.surface,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-
-    final stage = booking.status.stage;
-    final journey = stage / BookingStatusStage.stageCount;
-
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: GlassPageHeader(
-            title: 'Track Vehicle',
-            actions: [
-              GlassIconButton(
-                icon: Icons.refresh_rounded,
-                semanticLabel: 'Center map on vehicle',
-                onTap: recenter,
-              ),
-            ],
-          ),
-        ),
-
-        // ── Booking selector (if multiple active) ─────────────────
-        if (activeBookings.length > 1)
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 62,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.fromLTRB(24, 16, 24, 6),
-                itemCount: activeBookings.length,
-                separatorBuilder: (_, _) => SizedBox(width: 8),
-                itemBuilder: (context, i) {
-                  final b = activeBookings[i];
-                  final isSelected = b.id == booking.id;
-                  return GestureDetector(
-                    onTap: () => onSelectBooking(b),
-                    child: GlassPill(
-                      glow: isSelected,
-                      tint: isSelected ? context.colors.accent : null,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      child: Text(
-                        '#${shortRef(b.id)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: isSelected
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.55),
-                        ),
-                      ),
-                    ),
-                  );
+    return NotificationListener<DraggableScrollableNotification>(
+      onNotification: (n) {
+        _sheetExtent.value = n.extent;
+        return false;
+      },
+      child: Stack(
+        children: [
+          // ── Map ─────────────────────────────────────────────────
+          Positioned.fill(
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCameraFit: CameraFit.coordinates(
+                  coordinates: [_pickup, _dropoff, ?driver],
+                  padding: EdgeInsets.fromLTRB(
+                    40,
+                    200,
+                    40,
+                    screenHeight * sheetMin + 80,
+                  ),
+                  maxZoom: 15,
+                ),
+                backgroundColor: const Color(0xFF0E0F0F),
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                ),
+                onMapReady: () {
+                  _mapReady = true;
+                  if (_route != null) _fitAll();
+                },
+                onPositionChanged: (camera, hasGesture) {
+                  if (hasGesture && _follow) setState(() => _follow = false);
                 },
               ),
+              children: [
+                _tileLayer(),
+                PolylineLayer(polylines: _polylines(routeIndex)),
+                MarkerLayer(markers: _markers()),
+              ],
             ),
           ),
 
-        // ── Map ───────────────────────────────────────────────────
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(24, 16, 24, 0),
-            child: GlassContainer(
-              radius: 28,
-              height: 280,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: Stack(
-                  children: [
-                    FlutterMap(
-                      mapController: _mapController,
-                      options: MapOptions(
-                        initialCenter: currentLatLng,
-                        initialZoom:
-                            (booking.driverLat != null &&
-                                booking.driverLng != null)
-                            ? 14.0
-                            : 6.0,
-                      ),
-                      children: [
-                        TileLayer(
-                          urlTemplate:
-                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.carpitalconsult.app',
-                        ),
-                        PolylineLayer(
-                          polylines: [
-                            Polyline(
-                              points: [
-                                pickupLatLng,
-                                currentLatLng,
-                                dropoffLatLng,
-                              ],
-                              color: context.colors.accent,
-                              strokeWidth: 3.0,
-                            ),
-                          ],
-                        ),
-                        MarkerLayer(
-                          markers: [
-                            // Pickup
-                            Marker(
-                              point: pickupLatLng,
-                              width: 32,
-                              height: 32,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: context.colors.accent,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.black,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: Icon(
-                                  Icons.radio_button_checked,
-                                  color: Colors.black,
-                                  size: 16,
-                                ),
-                              ),
-                            ),
-                            // Current
-                            Marker(
-                              point: currentLatLng,
-                              width: 40,
-                              height: 40,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: context.colors.accent,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: context.colors.accent.withValues(
-                                        alpha: 0.4,
-                                      ),
-                                      blurRadius: 10,
-                                    ),
-                                  ],
-                                ),
-                                child: Icon(
-                                  Icons.local_shipping_rounded,
-                                  color: Colors.black,
-                                  size: 22,
-                                ),
-                              ),
-                            ),
-                            // Dropoff
-                            Marker(
-                              point: dropoffLatLng,
-                              width: 32,
-                              height: 32,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: context.colors.textLight,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.black,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: Icon(
-                                  Icons.location_on,
-                                  color: Colors.black,
-                                  size: 16,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    if (booking.driverLocationAt != null)
-                      Positioned(
-                        top: 12,
-                        left: 12,
-                        child: _FreshnessChip(at: booking.driverLocationAt!),
-                      ),
-                  ],
+          // ── Header over the map ─────────────────────────────────
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: Container(
+                height:
+                    MediaQuery.paddingOf(context).top + (multiple ? 190 : 140),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.85),
+                      Colors.black.withValues(alpha: 0),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-
-        // ── Journey gauge ──────────────────────────────────────────
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.only(top: 32),
-            child: Center(
-              child: ArcGauge(
-                progress: journey,
-                value: '${(journey * 100).round()}%',
-                label: booking.status.label,
-              ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GlassPageHeader(title: 'Track Vehicle'),
+                if (multiple) _bookingChips(),
+                if (booking.driverLocationAt != null)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(24, 14, 24, 0),
+                    child: _FreshnessChip(at: booking.driverLocationAt!),
+                  ),
+              ],
             ),
           ),
-        ),
 
-        // ── Distance and ETA ───────────────────────────────────────
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(24, 8, 24, 12),
-            child: _LiveProgressCard(booking: booking),
-          ),
-        ),
-
-        // ── Booking + driver ───────────────────────────────────────
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: GlassContainer(
-              radius: 24,
-              padding: EdgeInsets.all(18),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      GlassContainer(
-                        width: 44,
-                        height: 44,
-                        radius: 15,
-                        tint: context.colors.accent,
-                        child: Icon(
-                          Icons.directions_car_rounded,
-                          color: context.colors.accentLight,
-                          size: 21,
-                        ),
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              booking.vehicle.displayName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Booking #${shortRef(booking.id)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.white.withValues(alpha: 0.45),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      StatusBadge(status: booking.status, compact: true),
-                    ],
-                  ),
-                  if (booking.driverName != null) ...[
-                    SizedBox(height: 16),
-                    Container(
-                      height: 1,
-                      color: Colors.white.withValues(alpha: 0.06),
-                    ),
-                    SizedBox(height: 16),
-                    Row(
-                      children: [
-                        GlassContainer(
-                          width: 44,
-                          height: 44,
-                          radius: 22,
-                          child: Icon(
-                            Icons.person_rounded,
-                            color: Colors.white.withValues(alpha: 0.85),
-                            size: 22,
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                booking.driverName!,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Text(
-                                'Assigned Driver',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white.withValues(alpha: 0.5),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (booking.driverPhone != null)
+          // ── Controls riding just above the sheet ─────────────────
+          Positioned.fill(
+            child: ValueListenableBuilder<double>(
+              valueListenable: _sheetExtent,
+              builder: (context, extent, _) {
+                // The sheet only reports its extent once dragged, so never
+                // place the controls below its collapsed height.
+                final bottom = screenHeight * math.max(extent, sheetMin) + 12;
+                return Stack(
+                  children: [
+                    Positioned(
+                      right: 16,
+                      bottom: bottom,
+                      child: Column(
+                        children: [
                           GlassIconButton(
-                            icon: Icons.phone_rounded,
-                            size: 42,
-                            iconColor: context.colors.accent,
-                            semanticLabel: 'Call driver',
-                            onTap: () =>
-                                _callDriver(context, booking.driverPhone!),
+                            icon: _follow
+                                ? Icons.navigation_rounded
+                                : Icons.navigation_outlined,
+                            iconColor: _follow
+                                ? context.colors.accent
+                                : Colors.white,
+                            semanticLabel: 'Follow driver',
+                            onTap: _followDriver,
                           ),
-                      ],
+                          SizedBox(height: 10),
+                          GlassIconButton(
+                            icon: Icons.zoom_out_map_rounded,
+                            semanticLabel: 'Show whole route',
+                            onTap: _showWholeRoute,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      left: 16,
+                      bottom: bottom,
+                      child: Text(
+                        hasMapbox
+                            ? '© Mapbox © OpenStreetMap'
+                            : '© OpenStreetMap',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.white.withValues(alpha: 0.6),
+                          shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                        ),
+                      ),
                     ),
                   ],
-                ],
+                );
+              },
+            ),
+          ),
+
+          // ── Details sheet ───────────────────────────────────────
+          DraggableScrollableSheet(
+            initialChildSize: sheetMin,
+            minChildSize: sheetMin,
+            maxChildSize: _sheetMax,
+            snap: true,
+            builder: (context, scrollController) => _DetailsSheet(
+              scrollController: scrollController,
+              children: [
+                _LiveProgressCard(
+                  booking: booking,
+                  route: route,
+                  routeIndex: routeIndex,
+                ),
+                SizedBox(height: 12),
+                _bookingCard(),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(4, 28, 4, 14),
+                  child: Text(
+                    'Shipment Timeline',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                GlassContainer(
+                  radius: 24,
+                  padding: EdgeInsets.fromLTRB(18, 8, 18, 0),
+                  child: _StatusTimeline(status: booking.status),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tileLayer() {
+    final token = AppConstants.mapboxToken;
+    if (token == null) {
+      return TileLayer(
+        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        userAgentPackageName: 'com.carpitalconsult.app',
+      );
+    }
+    return TileLayer(
+      urlTemplate:
+          'https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}@2x?access_token={accessToken}',
+      additionalOptions: {'accessToken': token},
+      tileSize: 512,
+      zoomOffset: -1,
+      userAgentPackageName: 'com.carpitalconsult.app',
+    );
+  }
+
+  List<Polyline> _polylines(int? routeIndex) {
+    final accent = context.colors.accent;
+    final driver = _driver;
+    final route = _route;
+    final dashed = StrokePattern.dashed(segments: [10, 8]);
+
+    if (route == null) {
+      // No road route yet (or routing unavailable): straight dashed legs.
+      return [
+        Polyline(
+          points: [
+            if (!_afterPickup) ?driver,
+            _pickup,
+            if (_afterPickup) ?driver,
+            _dropoff,
+          ],
+          color: accent.withValues(alpha: 0.8),
+          strokeWidth: 3,
+          pattern: dashed,
+        ),
+      ];
+    }
+
+    // Split at the driver once they're on the pickup → drop-off leg, so the
+    // stretch already driven reads as done.
+    final split = (_afterPickup && routeIndex != null) ? routeIndex : 0;
+    final driven = route.points.sublist(0, split + 1);
+    final remaining = route.points.sublist(split);
+
+    return [
+      if (driven.length > 1)
+        Polyline(
+          points: driven,
+          color: Colors.white.withValues(alpha: 0.35),
+          strokeWidth: 4,
+        ),
+      Polyline(
+        points: remaining,
+        color: accent.withValues(alpha: 0.22),
+        strokeWidth: 14,
+      ),
+      Polyline(points: remaining, color: accent, strokeWidth: 4),
+      if (!_afterPickup && driver != null)
+        Polyline(
+          points: [driver, _pickup],
+          color: Colors.white.withValues(alpha: 0.7),
+          strokeWidth: 3,
+          pattern: dashed,
+        ),
+    ];
+  }
+
+  List<Marker> _markers() {
+    final accent = context.colors.accent;
+    final driver = _driver;
+    return [
+      Marker(
+        point: _pickup,
+        width: 30,
+        height: 30,
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: accent.withValues(alpha: 0.25),
+          ),
+          alignment: Alignment.center,
+          child: Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: accent,
+              border: Border.all(color: Colors.black, width: 2),
+              boxShadow: [
+                BoxShadow(color: accent.withValues(alpha: 0.7), blurRadius: 10),
+              ],
+            ),
+          ),
+        ),
+      ),
+      Marker(
+        point: _dropoff,
+        width: 40,
+        height: 40,
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF1A1C1B),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.35),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 8,
+              ),
+            ],
+          ),
+          child: Icon(Icons.location_on_rounded, color: Colors.white, size: 20),
+        ),
+      ),
+      if (driver != null)
+        Marker(
+          point: driver,
+          width: 48,
+          height: 48,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: context.colors.accentGradient,
+              border: Border.all(color: Colors.black, width: 2),
+              boxShadow: [
+                BoxShadow(color: accent.withValues(alpha: 0.6), blurRadius: 18),
+              ],
+            ),
+            child: Icon(
+              Icons.local_shipping_rounded,
+              color: Colors.black,
+              size: 22,
+            ),
+          ),
+        ),
+    ];
+  }
+
+  Widget _bookingChips() {
+    return SizedBox(
+      height: 56,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.fromLTRB(24, 14, 24, 0),
+        itemCount: widget.activeBookings.length,
+        separatorBuilder: (_, _) => SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final b = widget.activeBookings[i];
+          final isSelected = b.id == _booking.id;
+          return GestureDetector(
+            onTap: () => widget.onSelectBooking(b),
+            child: GlassPill(
+              blur: true,
+              glow: isSelected,
+              tint: isSelected ? context.colors.accent : null,
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: Text(
+                '#${shortRef(b.id)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: isSelected
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.7),
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
+      ),
+    );
+  }
 
-        // ── Status timeline ───────────────────────────────────────
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(24, 30, 24, 14),
-            child: Text(
-              'Shipment Timeline',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+  Widget _bookingCard() {
+    final booking = _booking;
+    return GlassContainer(
+      radius: 24,
+      padding: EdgeInsets.all(18),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              GlassContainer(
+                width: 44,
+                height: 44,
+                radius: 15,
+                tint: context.colors.accent,
+                child: Icon(
+                  Icons.directions_car_rounded,
+                  color: context.colors.accentLight,
+                  size: 21,
+                ),
               ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      booking.vehicle.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Booking #${shortRef(booking.id)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.45),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: 8),
+              StatusBadge(status: booking.status, compact: true),
+            ],
+          ),
+          if (booking.driverName != null) ...[
+            SizedBox(height: 16),
+            Container(height: 1, color: Colors.white.withValues(alpha: 0.06)),
+            SizedBox(height: 16),
+            Row(
+              children: [
+                GlassContainer(
+                  width: 44,
+                  height: 44,
+                  radius: 22,
+                  child: Icon(
+                    Icons.person_rounded,
+                    color: Colors.white.withValues(alpha: 0.85),
+                    size: 22,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        booking.driverName!,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        'Assigned Driver',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (booking.driverPhone != null)
+                  GlassIconButton(
+                    icon: Icons.phone_rounded,
+                    size: 42,
+                    iconColor: context.colors.accent,
+                    semanticLabel: 'Call driver',
+                    onTap: () => _callDriver(context, booking.driverPhone!),
+                  ),
+              ],
             ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Dark frosted sheet holding the trip details, with a grab handle on top.
+class _DetailsSheet extends StatelessWidget {
+  final ScrollController scrollController;
+  final List<Widget> children;
+
+  const _DetailsSheet({required this.scrollController, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    const radius = BorderRadius.vertical(top: Radius.circular(32));
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            color: const Color(0xE60D0E0E),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+          ),
+          child: ListView(
+            controller: scrollController,
+            // Clear the floating nav bar at the bottom.
+            padding: EdgeInsets.fromLTRB(
+              20,
+              10,
+              20,
+              MediaQuery.paddingOf(context).bottom + 24,
+            ),
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 5,
+                  margin: EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              ...children,
+            ],
           ),
         ),
-
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: GlassContainer(
-              radius: 24,
-              padding: EdgeInsets.fromLTRB(18, 8, 18, 0),
-              child: _StatusTimeline(status: booking.status),
-            ),
-          ),
-        ),
-
-        // Clear the floating nav bar.
-        SliverToBoxAdapter(
-          child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 24),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -587,14 +805,18 @@ class _FreshnessChipState extends State<_FreshnessChip> {
             ),
           ),
           SizedBox(width: 6),
-          Text(
-            isStale
-                ? 'Last seen ${_formatAgo(age)}'
-                : 'Live · updated ${_formatAgo(age)}',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+          Flexible(
+            child: Text(
+              isStale
+                  ? 'Last seen ${_formatAgo(age)}'
+                  : 'Live · updated ${_formatAgo(age)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
@@ -603,7 +825,9 @@ class _FreshnessChipState extends State<_FreshnessChip> {
   }
 }
 
-/// Distance left and a rough arrival estimate.
+/// Distance left and an arrival estimate: measured along the road once the
+/// vehicle is picked up and a route is available, otherwise a rough
+/// straight-line guess.
 class _LiveProgressCard extends StatelessWidget {
   // Straight-line distance understates road distance; this is a typical detour factor.
   static const _roadFactor = 1.3;
@@ -611,7 +835,12 @@ class _LiveProgressCard extends StatelessWidget {
   static const _avgSpeedKmh = 45.0;
 
   final BookingModel booking;
-  const _LiveProgressCard({required this.booking});
+  final RoadRoute? route;
+
+  /// Index of the route point nearest the driver, when [route] is known.
+  final int? routeIndex;
+
+  const _LiveProgressCard({required this.booking, this.route, this.routeIndex});
 
   String _formatEta(double hours) {
     final minutes = (hours * 60).round();
@@ -648,7 +877,15 @@ class _LiveProgressCard extends StatelessWidget {
           LatLng(target.lat, target.lng),
         ) /
         1000;
-    final roadKm = km * _roadFactor;
+    final route = this.route;
+    final routeIndex = this.routeIndex;
+    final onRoute = !headingToPickup && route != null && routeIndex != null;
+    final roadKm = onRoute
+        ? route.remainingFromM(routeIndex) / 1000
+        : km * _roadFactor;
+    final hours = onRoute
+        ? route.durationS * (roadKm * 1000 / route.distanceM) / 3600
+        : roadKm / _avgSpeedKmh;
 
     final String title;
     final String subtitle;
@@ -663,7 +900,7 @@ class _LiveProgressCard extends StatelessWidget {
           : roadKm.round().toString();
       title =
           'About $distance km ${headingToPickup ? 'to pickup' : 'to delivery'}';
-      subtitle = 'Estimated arrival in ${_formatEta(roadKm / _avgSpeedKmh)}';
+      subtitle = 'Estimated arrival in ${_formatEta(hours)}';
     }
 
     return _card(
