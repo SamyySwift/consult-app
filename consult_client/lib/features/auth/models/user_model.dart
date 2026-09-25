@@ -19,7 +19,8 @@ class UserModel {
 
   String get fullName => '$firstName $lastName';
   String get initials =>
-      '${firstName.isNotEmpty ? firstName[0] : ''}${lastName.isNotEmpty ? lastName[0] : ''}'.toUpperCase();
+      '${firstName.isNotEmpty ? firstName[0] : ''}${lastName.isNotEmpty ? lastName[0] : ''}'
+          .toUpperCase();
 
   UserModel copyWith({
     String? firstName,
@@ -40,35 +41,35 @@ class UserModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'firstName': firstName,
-        'lastName': lastName,
-        'email': email,
-        'phone': phone,
-        'avatarUrl': avatarUrl,
-        'createdAt': createdAt.toIso8601String(),
-      };
+    'id': id,
+    'firstName': firstName,
+    'lastName': lastName,
+    'email': email,
+    'phone': phone,
+    'avatarUrl': avatarUrl,
+    'createdAt': createdAt.toIso8601String(),
+  };
 
   Map<String, dynamic> toSupabaseMap() => {
-        'id': id,
-        'first_name': firstName,
-        'last_name': lastName,
-        'email': email,
-        'phone': phone,
-        'avatar_url': avatarUrl,
-      };
+    'id': id,
+    'first_name': firstName,
+    'last_name': lastName,
+    'email': email,
+    'phone': phone,
+    'avatar_url': avatarUrl,
+  };
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
-        id: json['id'] as String? ?? '',
-        firstName: (json['firstName'] ?? json['first_name'] ?? '') as String,
-        lastName: (json['lastName'] ?? json['last_name'] ?? '') as String,
-        email: json['email'] as String? ?? '',
-        phone: json['phone'] as String? ?? '',
-        avatarUrl: (json['avatarUrl'] ?? json['avatar_url']) as String?,
-        createdAt: json['createdAt'] != null
-            ? DateTime.parse(json['createdAt'] as String)
-            : json['created_at'] != null
-                ? DateTime.parse(json['created_at'] as String)
-                : DateTime.now(),
-      );
+    id: json['id'] as String? ?? '',
+    firstName: (json['firstName'] ?? json['first_name'] ?? '') as String,
+    lastName: (json['lastName'] ?? json['last_name'] ?? '') as String,
+    email: json['email'] as String? ?? '',
+    phone: json['phone'] as String? ?? '',
+    avatarUrl: (json['avatarUrl'] ?? json['avatar_url']) as String?,
+    createdAt: json['createdAt'] != null
+        ? DateTime.parse(json['createdAt'] as String)
+        : json['created_at'] != null
+        ? DateTime.parse(json['created_at'] as String)
+        : DateTime.now(),
+  );
 }

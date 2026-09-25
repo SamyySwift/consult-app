@@ -58,7 +58,9 @@ class AuthProvider extends ChangeNotifier {
     final userData = prefs.getString(AppConstants.keyUserData);
     if (userData != null) {
       try {
-        _user = UserModel.fromJson(jsonDecode(userData) as Map<String, dynamic>);
+        _user = UserModel.fromJson(
+          jsonDecode(userData) as Map<String, dynamic>,
+        );
         _status = AuthStatus.authenticated;
       } catch (_) {
         _status = AuthStatus.unauthenticated;
@@ -90,7 +92,8 @@ class AuthProvider extends ChangeNotifier {
         return true;
       } else {
         _status = AuthStatus.error;
-        _errorMessage = res.errorMessage ?? 'Unable to sign in. Please try again.';
+        _errorMessage =
+            res.errorMessage ?? 'Unable to sign in. Please try again.';
         notifyListeners();
         return false;
       }
@@ -156,7 +159,9 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final targetEmail = (email != null && email.isNotEmpty) ? email.trim() : _user?.email;
+      final targetEmail = (email != null && email.isNotEmpty)
+          ? email.trim()
+          : _user?.email;
       if (targetEmail == null || targetEmail.isEmpty) {
         _status = AuthStatus.unauthenticated;
         _errorMessage = 'No email address found to verify.';
@@ -219,7 +224,12 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> updateProfile({String? firstName, String? lastName, String? phone, String? avatarUrl}) async {
+  Future<void> updateProfile({
+    String? firstName,
+    String? lastName,
+    String? phone,
+    String? avatarUrl,
+  }) async {
     if (_user == null) return;
     _user = _user!.copyWith(
       firstName: firstName,
@@ -244,7 +254,10 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _saveUser() async {
     if (_user == null) return;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(AppConstants.keyUserData, jsonEncode(_user!.toJson()));
+    await prefs.setString(
+      AppConstants.keyUserData,
+      jsonEncode(_user!.toJson()),
+    );
   }
 
   void clearError() {

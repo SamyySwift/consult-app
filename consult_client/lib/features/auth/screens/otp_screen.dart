@@ -8,16 +8,11 @@ import '../providers/auth_provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 
-
 class OtpScreen extends StatefulWidget {
   final String? email;
   final String? phone;
 
-  const OtpScreen({
-    super.key,
-    this.email,
-    this.phone,
-  });
+  const OtpScreen({super.key, this.email, this.phone});
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -151,7 +146,10 @@ class _OtpScreenState extends State<OtpScreen> {
 
     final filledTheme = defaultTheme.copyWith(
       decoration: defaultTheme.decoration!.copyWith(
-        border: Border.all(color: context.colors.accent.withValues(alpha: 0.4), width: 1.5),
+        border: Border.all(
+          color: context.colors.accent.withValues(alpha: 0.4),
+          width: 1.5,
+        ),
         color: context.colors.accent.withValues(alpha: 0.06),
       ),
     );
@@ -164,7 +162,9 @@ class _OtpScreenState extends State<OtpScreen> {
             children: [
               Container(
                 height: 220,
-                decoration: BoxDecoration(gradient: context.colors.heroGradient),
+                decoration: BoxDecoration(
+                  gradient: context.colors.heroGradient,
+                ),
               ),
               SafeArea(
                 child: SingleChildScrollView(
@@ -174,153 +174,181 @@ class _OtpScreenState extends State<OtpScreen> {
                     children: [
                       SizedBox(height: 12),
                       IconButton(
-                        icon: Icon(Icons.arrow_back_rounded, color: Colors.white),
+                        icon: Icon(
+                          Icons.arrow_back_rounded,
+                          color: Colors.white,
+                        ),
                         onPressed: () => context.go(AppConstants.routeRegister),
                       ),
                       SizedBox(height: 16),
 
                       // Verify illustration
                       Center(
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.mark_email_read_outlined,
-                            size: 40,
-                            color: Colors.white,
-                          ),
-                        ).animate().scale(duration: 500.ms, curve: Curves.elasticOut),
+                        child:
+                            Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.mark_email_read_outlined,
+                                size: 40,
+                                color: Colors.white,
+                              ),
+                            ).animate().scale(
+                              duration: 500.ms,
+                              curve: Curves.elasticOut,
+                            ),
                       ),
 
                       SizedBox(height: 32),
 
                       Center(
-                        child: Container(
-                          padding: EdgeInsets.all(28),
-                          decoration: BoxDecoration(
-                            color: context.colors.surface,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.08),
-                                blurRadius: 24,
-                                offset: Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Verify Your Email',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w700,
-                                  color: context.colors.textPrimary,
-                                ),
-                              ),
-
-                              SizedBox(height: 8),
-
-                              Text.rich(
-                                TextSpan(
-                                  text: 'We sent a 6-digit code to\n',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: context.colors.textSecondary,
-                                    height: 1.5,
-                                  ),
-                                  children: [
-                                    TextSpan(
-                                      text: _getDestination(auth),
-                                      style: TextStyle(
-                                        color: context.colors.textPrimary,
-                                        fontWeight: FontWeight.w600,
+                        child:
+                            Container(
+                                  padding: EdgeInsets.all(28),
+                                  decoration: BoxDecoration(
+                                    color: context.colors.surface,
+                                    borderRadius: BorderRadius.circular(24),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.08,
+                                        ),
+                                        blurRadius: 24,
+                                        offset: Offset(0, 8),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-
-                              SizedBox(height: 32),
-
-                              Pinput(
-                                length: 6,
-                                defaultPinTheme: defaultTheme,
-                                focusedPinTheme: focusedTheme,
-                                submittedPinTheme: filledTheme,
-                                onChanged: (v) => setState(() => _otp = v),
-                                onCompleted: (_) => _verify(),
-                                keyboardType: TextInputType.number,
-                              ),
-
-                              SizedBox(height: 28),
-
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: (_otp.length == 6 && !auth.isLoading) ? _verify : null,
-                                  child: auth.isLoading
-                                      ? SizedBox(
-                                          width: 22,
-                                          height: 22,
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 2.5,
-                                          ),
-                                        )
-                                      : Text('Verify Code'),
-                                ),
-                              ),
-
-                              SizedBox(height: 20),
-
-                              if (_canResend)
-                                TextButton.icon(
-                                  onPressed: auth.isLoading ? null : _resendCode,
-                                  icon: Icon(Icons.refresh_rounded, size: 18),
-                                  label: Text('Resend Code'),
-                                )
-                              else
-                                RichText(
-                                  text: TextSpan(
-                                    text: "Resend code in ",
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: context.colors.textSecondary,
-                                    ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
-                                      TextSpan(
-                                        text: '${_secondsLeft}s',
+                                      Text(
+                                        'Verify Your Email',
                                         style: TextStyle(
-                                          color: context.colors.accent,
-                                          fontWeight: FontWeight.w600,
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w700,
+                                          color: context.colors.textPrimary,
+                                        ),
+                                      ),
+
+                                      SizedBox(height: 8),
+
+                                      Text.rich(
+                                        TextSpan(
+                                          text: 'We sent a 6-digit code to\n',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: context.colors.textSecondary,
+                                            height: 1.5,
+                                          ),
+                                          children: [
+                                            TextSpan(
+                                              text: _getDestination(auth),
+                                              style: TextStyle(
+                                                color:
+                                                    context.colors.textPrimary,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+
+                                      SizedBox(height: 32),
+
+                                      Pinput(
+                                        length: 6,
+                                        defaultPinTheme: defaultTheme,
+                                        focusedPinTheme: focusedTheme,
+                                        submittedPinTheme: filledTheme,
+                                        onChanged: (v) =>
+                                            setState(() => _otp = v),
+                                        onCompleted: (_) => _verify(),
+                                        keyboardType: TextInputType.number,
+                                      ),
+
+                                      SizedBox(height: 28),
+
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          onPressed:
+                                              (_otp.length == 6 &&
+                                                  !auth.isLoading)
+                                              ? _verify
+                                              : null,
+                                          child: auth.isLoading
+                                              ? SizedBox(
+                                                  width: 22,
+                                                  height: 22,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        color: Colors.white,
+                                                        strokeWidth: 2.5,
+                                                      ),
+                                                )
+                                              : Text('Verify Code'),
+                                        ),
+                                      ),
+
+                                      SizedBox(height: 20),
+
+                                      if (_canResend)
+                                        TextButton.icon(
+                                          onPressed: auth.isLoading
+                                              ? null
+                                              : _resendCode,
+                                          icon: Icon(
+                                            Icons.refresh_rounded,
+                                            size: 18,
+                                          ),
+                                          label: Text('Resend Code'),
+                                        )
+                                      else
+                                        RichText(
+                                          text: TextSpan(
+                                            text: "Resend code in ",
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color:
+                                                  context.colors.textSecondary,
+                                            ),
+                                            children: [
+                                              TextSpan(
+                                                text: '${_secondsLeft}s',
+                                                style: TextStyle(
+                                                  color: context.colors.accent,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                      SizedBox(height: 12),
+
+                                      TextButton(
+                                        onPressed: () =>
+                                            context.go(AppConstants.routeLogin),
+                                        child: Text(
+                                          'Back to Sign In',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: context.colors.textSecondary,
+                                          ),
                                         ),
                                       ),
                                     ],
                                   ),
-                                ),
-
-                              SizedBox(height: 12),
-
-                              TextButton(
-                                onPressed: () => context.go(AppConstants.routeLogin),
-                                child: Text(
-                                  'Back to Sign In',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: context.colors.textSecondary,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ).animate(delay: 100.ms).fadeIn(duration: 400.ms).slideY(begin: 0.08),
+                                )
+                                .animate(delay: 100.ms)
+                                .fadeIn(duration: 400.ms)
+                                .slideY(begin: 0.08),
                       ),
                     ],
                   ),

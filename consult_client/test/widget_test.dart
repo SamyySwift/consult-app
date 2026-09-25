@@ -45,7 +45,7 @@ void main() {
 
       await tester.pump(const Duration(milliseconds: 200));
 
-      expect(find.text('CARPITAL CONSULT'), findsOneWidget);
+      expect(find.text('CARPITAL CONSULT'), findsNothing);
       expect(find.textContaining('Relocate Your Vehicle'), findsOneWidget);
       expect(find.text('Slide to Get Started'), findsOneWidget);
       expect(find.text('100%'), findsOneWidget);

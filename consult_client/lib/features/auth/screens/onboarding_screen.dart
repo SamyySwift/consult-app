@@ -76,7 +76,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!_isInitialized) return;
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       _videoController.pause();
     } else if (state == AppLifecycleState.resumed) {
       _videoController.play();
@@ -155,29 +156,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             ),
           ),
 
-          // ── Layer 4: Top Floating Brand Capsule ───────────────────────────
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                child: _buildBrandHeader(),
-              ),
-            ),
-          ),
-
-          // ── Layer 5: Bottom Interactive Hero Deck ─────────────────────────
+          // ── Layer 4: Bottom Interactive Hero Deck ─────────────────────────
           SafeArea(
             child: Align(
               alignment: Alignment.bottomCenter,
               child: SingleChildScrollView(
                 physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 18,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-
                     // Monumental Editorial Headline
                     _buildHeadline(),
                     const SizedBox(height: 12),
@@ -210,42 +202,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  Widget _buildBrandHeader() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(30),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.40),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.16),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const _LiveStatusPulse(),
-              const SizedBox(width: 8),
-              Text(
-                'CARPITAL CONSULT',
-                style: GoogleFonts.plusJakartaSans(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 2.2,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildHeadline() {
     return Text.rich(
       TextSpan(
@@ -263,11 +219,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             baseline: TextBaseline.alphabetic,
             child: ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
-                colors: [
-                  Color(0xFF00E676),
-                  Color(0xFF69F0AE),
-                  Colors.white,
-                ],
+                colors: [Color(0xFF00E676), Color(0xFF69F0AE), Colors.white],
               ).createShader(bounds),
               child: Text(
                 'Absolute Precision.',
@@ -379,88 +331,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LiveStatusPulse extends StatefulWidget {
-  const _LiveStatusPulse();
-
-  @override
-  State<_LiveStatusPulse> createState() => _LiveStatusPulseState();
-}
-
-class _LiveStatusPulseState extends State<_LiveStatusPulse>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animController;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _opacityAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1600),
-    )..repeat();
-
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 2.2).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
-    );
-    _opacityAnimation = Tween<double>(begin: 0.8, end: 0.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _animController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 10,
-      height: 10,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          AnimatedBuilder(
-            animation: _animController,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _scaleAnimation.value,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF00E676).withValues(
-                      alpha: _opacityAnimation.value,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          Container(
-            width: 7,
-            height: 7,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Color(0xFF00E676),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0xFF00E676),
-                  blurRadius: 6,
-                  spreadRadius: 1,
-                ),
-              ],
             ),
           ),
         ],

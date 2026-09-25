@@ -913,3 +913,114 @@ class GlassPillButton extends StatelessWidget {
     );
   }
 }
+
+/// Primary call to action: a dark glass pill with an accent aurora glowing
+/// along its bottom edge (Opal's "Continue" button, in our greens).
+class GlowButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final bool isLoading;
+  final double height;
+
+  const GlowButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.isLoading = false,
+    this.height = 58,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.colors.accent;
+    final accentLight = context.colors.accentLight;
+    final enabled = onPressed != null && !isLoading;
+
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: enabled ? onPressed : null,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 200),
+          opacity: onPressed == null && !isLoading ? 0.5 : 1,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: [
+                BoxShadow(color: accent.withValues(alpha: 0.18), blurRadius: 24, offset: const Offset(0, 8)),
+              ],
+            ),
+            child: GlassContainer(
+              radius: 999,
+              child: SizedBox(
+                height: height,
+                width: double.infinity,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0xFF1B1F1C), Color(0xFF0B0D0C)],
+                          ),
+                        ),
+                      ),
+                      // Aurora: a horizontal accent band, faded out towards the top.
+                      ShaderMask(
+                        blendMode: BlendMode.dstIn,
+                        shaderCallback: (rect) => const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          stops: [0.15, 0.7, 1],
+                          colors: [Colors.transparent, Color(0x80FFFFFF), Colors.white],
+                        ).createShader(rect),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              stops: const [0, 0.3, 0.6, 0.85, 1],
+                              colors: [
+                                accent.withValues(alpha: 0),
+                                accent.withValues(alpha: 0.75),
+                                accentLight.withValues(alpha: 0.85),
+                                accentLight.withValues(alpha: 0.35),
+                                accentLight.withValues(alpha: 0),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Center(
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                              )
+                            : Text(
+                                label,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
