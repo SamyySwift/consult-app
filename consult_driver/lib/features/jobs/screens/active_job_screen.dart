@@ -2,9 +2,8 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../core/theme/driver_colors.dart';
 import '../../../core/network/route_service.dart';
 import '../../../core/widgets/driver_button.dart';
@@ -14,6 +13,7 @@ import '../../../core/services/driver_location_access.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/links.dart';
+import '../../../core/utils/map_utils.dart';
 import '../../../core/widgets/surface.dart';
 import '../providers/job_provider.dart';
 import '../models/job_model.dart';
@@ -208,9 +208,12 @@ class _JobMapState extends State<_JobMap> {
   // Roughly the height of the bottom sheet, so fitted routes stay visible.
   static const _sheetAllowance = 400.0;
 
-  final MapController _mapController = MapController();
-  bool _mapReady = false;
+  GoogleMapController? _mapController;
   RoadRoute? _route;
+
+  BitmapDescriptor? _pickupIcon;
+  BitmapDescriptor? _dropoffIcon;
+  BitmapDescriptor? _driverIcon;
 
   LatLng get _pickup => LatLng(widget.job.pickup.lat, widget.job.pickup.lng);
   LatLng get _dropoff => LatLng(widget.job.dropoff.lat, widget.job.dropoff.lng);
@@ -219,6 +222,12 @@ class _JobMapState extends State<_JobMap> {
   void initState() {
     super.initState();
     _loadRoute();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadIcons();
   }
 
   @override
@@ -238,178 +247,169 @@ class _JobMapState extends State<_JobMap> {
     _fitRoute();
   }
 
-  void _fitRoute() {
-    if (!_mapReady) return;
-    _mapController.fitCamera(
-      CameraFit.coordinates(
-        coordinates: [_pickup, _dropoff, ...?_route?.points],
-        padding: EdgeInsets.fromLTRB(40, MediaQuery.paddingOf(context).top + 90, 40, _sheetAllowance),
-        maxZoom: 15,
+  Future<void> _loadIcons() async {
+    final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final icons = await Future.wait([
+      MarkerIcons.circle(
+        size: 14,
+        pixelRatio: pixelRatio,
+        color: DriverColors.accent,
+        borderColor: Colors.black,
+        borderWidth: 2,
+        glow: DriverColors.accent.withValues(alpha: 0.7),
+        glowBlur: 10,
+        halo: DriverColors.accent.withValues(alpha: 0.25),
+        haloSize: 30,
       ),
-    );
+      MarkerIcons.circle(
+        size: 40,
+        pixelRatio: pixelRatio,
+        color: const Color(0xFF1A1C1B),
+        borderColor: Colors.white.withValues(alpha: 0.35),
+        borderWidth: 1.5,
+        icon: Icons.flag_rounded,
+        iconSize: 20,
+        glow: Colors.black.withValues(alpha: 0.5),
+        glowBlur: 8,
+      ),
+      MarkerIcons.circle(
+        size: 48,
+        pixelRatio: pixelRatio,
+        gradient: DriverColors.accentGradient,
+        borderColor: Colors.black,
+        borderWidth: 2,
+        icon: Icons.local_shipping_rounded,
+        iconColor: Colors.black,
+        iconSize: 22,
+        glow: DriverColors.accent.withValues(alpha: 0.6),
+        glowBlur: 18,
+      ),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _pickupIcon = icons[0];
+      _dropoffIcon = icons[1];
+      _driverIcon = icons[2];
+    });
+  }
+
+  void _fitRoute() {
+    final controller = _mapController;
+    if (controller == null) return;
+    fitPoints(controller, [_pickup, _dropoff, ...?_route?.points]);
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasMapbox = AppConstants.mapboxToken != null;
     final driverPosition = context.read<JobProvider>().driverPosition;
 
     return Stack(
       children: [
         Positioned.fill(
-          child: FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCameraFit: CameraFit.coordinates(
-                coordinates: [_pickup, _dropoff],
-                padding: EdgeInsets.fromLTRB(40, 120, 40, _sheetAllowance),
-                maxZoom: 15,
+          child: ValueListenableBuilder<Position?>(
+            valueListenable: driverPosition,
+            builder: (context, position, _) => GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: LatLng(
+                  (_pickup.latitude + _dropoff.latitude) / 2,
+                  (_pickup.longitude + _dropoff.longitude) / 2,
+                ),
+                zoom: 11,
               ),
-              backgroundColor: const Color(0xFF0E0F0F),
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+              style: darkMapStyle,
+              // Keeps fits and the Google logo clear of the header and job sheet
+              padding: EdgeInsets.only(
+                top: MediaQuery.paddingOf(context).top + 50,
+                bottom: _sheetAllowance,
               ),
-              onMapReady: () {
-                _mapReady = true;
-                if (_route != null) _fitRoute();
+              rotateGesturesEnabled: false,
+              tiltGesturesEnabled: false,
+              zoomControlsEnabled: false,
+              myLocationButtonEnabled: false,
+              mapToolbarEnabled: false,
+              compassEnabled: false,
+              onMapCreated: (controller) {
+                _mapController = controller;
+                _fitRoute();
+              },
+              polylines: _polylines(),
+              markers: {
+                ..._endpointMarkers(),
+                if (position != null && _driverIcon != null)
+                  Marker(
+                    markerId: const MarkerId('driver'),
+                    position: LatLng(position.latitude, position.longitude),
+                    icon: _driverIcon!,
+                    anchor: const Offset(0.5, 0.5),
+                    zIndexInt: 1,
+                  ),
               },
             ),
-            children: [
-              _tileLayer(),
-              PolylineLayer(polylines: _polylines()),
-              MarkerLayer(markers: _endpointMarkers()),
-              ValueListenableBuilder<Position?>(
-                valueListenable: driverPosition,
-                builder: (context, position, _) => MarkerLayer(
-                  markers: [
-                    if (position != null)
-                      Marker(
-                        point: LatLng(position.latitude, position.longitude),
-                        width: 48,
-                        height: 48,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: DriverColors.accentGradient,
-                            border: Border.all(color: Colors.black, width: 2),
-                            boxShadow: [
-                              BoxShadow(color: DriverColors.accent.withValues(alpha: 0.6), blurRadius: 18),
-                            ],
-                          ),
-                          child: const Icon(Icons.local_shipping_rounded, color: Colors.black, size: 22),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
           ),
         ),
 
-        // Show the whole route + map credit, top right under the status bar.
+        // Show the whole route, top right under the status bar.
         Positioned(
           top: MediaQuery.paddingOf(context).top + 10,
           right: 16,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              GlassIconButton(
-                icon: Icons.zoom_out_map_rounded,
-                semanticLabel: 'Show whole route',
-                onTap: _fitRoute,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                hasMapbox ? '© Mapbox © OpenStreetMap' : '© OpenStreetMap',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.6),
-                  shadows: const [Shadow(color: Colors.black, blurRadius: 4)],
-                ),
-              ),
-            ],
+          child: GlassIconButton(
+            icon: Icons.zoom_out_map_rounded,
+            semanticLabel: 'Show whole route',
+            onTap: _fitRoute,
           ),
         ),
       ],
     );
   }
 
-  Widget _tileLayer() {
-    final token = AppConstants.mapboxToken;
-    if (token == null) {
-      return TileLayer(
-        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        userAgentPackageName: 'com.carpitalconsult.driver',
-      );
-    }
-    return TileLayer(
-      urlTemplate:
-          'https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}@2x?access_token={accessToken}',
-      additionalOptions: {'accessToken': token},
-      tileSize: 512,
-      zoomOffset: -1,
-      userAgentPackageName: 'com.carpitalconsult.driver',
-    );
-  }
-
-  List<Polyline> _polylines() {
+  Set<Polyline> _polylines() {
     final route = _route;
     if (route == null) {
       // No road route yet (or routing unavailable): a straight dashed line.
-      return [
+      return {
         Polyline(
+          polylineId: const PolylineId('straight'),
           points: [_pickup, _dropoff],
           color: DriverColors.accent.withValues(alpha: 0.8),
-          strokeWidth: 3,
-          pattern: StrokePattern.dashed(segments: const [10, 8]),
+          width: 3,
+          patterns: [PatternItem.dash(10), PatternItem.gap(8)],
         ),
-      ];
+      };
     }
-    return [
-      Polyline(points: route.points, color: DriverColors.accent.withValues(alpha: 0.22), strokeWidth: 14),
-      Polyline(points: route.points, color: DriverColors.accent, strokeWidth: 4),
-    ];
+    return {
+      Polyline(
+        polylineId: const PolylineId('route-glow'),
+        points: route.points,
+        color: DriverColors.accent.withValues(alpha: 0.22),
+        width: 14,
+      ),
+      Polyline(
+        polylineId: const PolylineId('route'),
+        points: route.points,
+        color: DriverColors.accent,
+        width: 4,
+        zIndex: 1,
+      ),
+    };
   }
 
-  List<Marker> _endpointMarkers() {
-    return [
-      Marker(
-        point: _pickup,
-        width: 30,
-        height: 30,
-        child: Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: DriverColors.accent.withValues(alpha: 0.25),
-          ),
-          alignment: Alignment.center,
-          child: Container(
-            width: 14,
-            height: 14,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: DriverColors.accent,
-              border: Border.all(color: Colors.black, width: 2),
-              boxShadow: [BoxShadow(color: DriverColors.accent.withValues(alpha: 0.7), blurRadius: 10)],
-            ),
-          ),
+  Set<Marker> _endpointMarkers() {
+    return {
+      if (_pickupIcon != null)
+        Marker(
+          markerId: const MarkerId('pickup'),
+          position: _pickup,
+          icon: _pickupIcon!,
+          anchor: const Offset(0.5, 0.5),
         ),
-      ),
-      Marker(
-        point: _dropoff,
-        width: 40,
-        height: 40,
-        child: Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: const Color(0xFF1A1C1B),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.5),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 8)],
-          ),
-          child: const Icon(Icons.flag_rounded, color: Colors.white, size: 20),
+      if (_dropoffIcon != null)
+        Marker(
+          markerId: const MarkerId('dropoff'),
+          position: _dropoff,
+          icon: _dropoffIcon!,
+          anchor: const Offset(0.5, 0.5),
         ),
-      ),
-    ];
+    };
   }
 }
 

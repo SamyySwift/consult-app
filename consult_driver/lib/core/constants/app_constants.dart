@@ -37,13 +37,6 @@ class AppConstants {
   static String get apiBaseUrl =>
       dotenv.env['API_BASE_URL'] ?? 'https://carpitalconsult.com';
 
-  /// Mapbox public token (`pk.…`) for map tiles. Null when not configured,
-  /// in which case maps fall back to OpenStreetMap tiles.
-  static String? get mapboxToken {
-    final token = dotenv.isInitialized ? dotenv.env['MAPBOX_PUBLIC_TOKEN'] : null;
-    return (token == null || token.isEmpty) ? null : token;
-  }
-
   // Storage Keys
   static const String keyUserData = 'driver_user_data';
   static const String keyAuthToken = 'driver_auth_token';

@@ -43,13 +43,6 @@ class AppConstants {
   static String get wsBaseUrl =>
       apiBaseUrl.replaceFirst(RegExp(r'^http'), 'ws');
 
-  /// Mapbox public token (`pk.…`) for map tiles. Null when not configured,
-  /// in which case maps fall back to OpenStreetMap tiles.
-  static String? get mapboxToken {
-    final token = dotenv.isInitialized ? dotenv.env['MAPBOX_PUBLIC_TOKEN'] : null;
-    return (token == null || token.isEmpty) ? null : token;
-  }
-
   // Supabase Configuration
   static const String supabaseUrl = 'https://ulksjcitenlxtvxwvktw.supabase.co';
   static String get supabaseAnonKey =>

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/booking_provider.dart';
 import '../widgets/address_search_field.dart';
 import '../../../../core/services/geocoding_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/map_utils.dart';
 import '../../../../core/widgets/custom_button.dart';
 
 class Step2Locations extends StatefulWidget {
@@ -249,72 +249,113 @@ class _Step2LocationsState extends State<Step2Locations> {
 }
 
 /// Static preview of the chosen points so the client can see they're right.
-class _RoutePreviewMap extends StatelessWidget {
+class _RoutePreviewMap extends StatefulWidget {
   final PlaceResult? pickup;
   final PlaceResult? dropoff;
 
   const _RoutePreviewMap({this.pickup, this.dropoff});
 
   @override
+  State<_RoutePreviewMap> createState() => _RoutePreviewMapState();
+}
+
+class _RoutePreviewMapState extends State<_RoutePreviewMap> {
+  GoogleMapController? _controller;
+  BitmapDescriptor? _pickupIcon;
+  BitmapDescriptor? _dropoffIcon;
+
+  LatLng? get _pickup => widget.pickup == null ? null : LatLng(widget.pickup!.lat, widget.pickup!.lng);
+  LatLng? get _dropoff => widget.dropoff == null ? null : LatLng(widget.dropoff!.lat, widget.dropoff!.lng);
+  List<LatLng> get _points => [?_pickup, ?_dropoff];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadIcons();
+  }
+
+  @override
+  void didUpdateWidget(covariant _RoutePreviewMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final controller = _controller;
+    if (controller != null) fitPoints(controller, _points, edge: 36);
+  }
+
+  Future<void> _loadIcons() async {
+    Future<BitmapDescriptor> pin(Color color, IconData icon) => MarkerIcons.circle(
+          size: 28,
+          pixelRatio: MediaQuery.devicePixelRatioOf(context),
+          color: color,
+          borderColor: Colors.white,
+          borderWidth: 2,
+          icon: icon,
+          iconSize: 14,
+        );
+    final icons = await Future.wait([
+      pin(context.colors.success, Icons.radio_button_checked),
+      pin(context.colors.error, Icons.location_on),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _pickupIcon = icons[0];
+      _dropoffIcon = icons[1];
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final points = [
-      if (pickup != null) LatLng(pickup!.lat, pickup!.lng),
-      if (dropoff != null) LatLng(dropoff!.lat, dropoff!.lng),
-    ];
+    final points = _points;
+    final pickup = _pickup;
+    final dropoff = _dropoff;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: SizedBox(
         height: 180,
-        child: FlutterMap(
-          // Rebuild when a point changes so the camera re-fits
-          key: ValueKey(points.map((p) => '${p.latitude},${p.longitude}').join('|')),
-          options: MapOptions(
-            initialCenter: points.first,
-            initialZoom: 15,
-            initialCameraFit: points.length > 1
-                ? CameraFit.coordinates(coordinates: points, padding: EdgeInsets.all(36))
-                : null,
-            interactionOptions: InteractionOptions(flags: InteractiveFlag.none),
-          ),
-          children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.carpitalconsult.app',
-            ),
+        child: GoogleMap(
+          initialCameraPosition: CameraPosition(target: points.first, zoom: 15),
+          onMapCreated: (controller) {
+            _controller = controller;
+            fitPoints(controller, points, edge: 36, animate: false);
+          },
+          // Android draws a static snapshot, which is cheaper inside a scrolling form
+          liteModeEnabled: true,
+          scrollGesturesEnabled: false,
+          zoomGesturesEnabled: false,
+          rotateGesturesEnabled: false,
+          tiltGesturesEnabled: false,
+          zoomControlsEnabled: false,
+          myLocationButtonEnabled: false,
+          mapToolbarEnabled: false,
+          polylines: {
             if (points.length > 1)
-              PolylineLayer(
-                polylines: [
-                  Polyline(points: points, color: context.colors.accent, strokeWidth: 3),
-                ],
+              Polyline(
+                polylineId: const PolylineId('route'),
+                points: points,
+                color: context.colors.accent,
+                width: 3,
               ),
-            MarkerLayer(
-              markers: [
-                if (pickup != null)
-                  _pin(context, LatLng(pickup!.lat, pickup!.lng), context.colors.success, Icons.radio_button_checked),
-                if (dropoff != null)
-                  _pin(context, LatLng(dropoff!.lat, dropoff!.lng), context.colors.error, Icons.location_on),
-              ],
-            ),
-          ],
+          },
+          markers: {
+            if (pickup != null && _pickupIcon != null)
+              Marker(
+                markerId: const MarkerId('pickup'),
+                position: pickup,
+                icon: _pickupIcon!,
+                anchor: const Offset(0.5, 0.5),
+              ),
+            if (dropoff != null && _dropoffIcon != null)
+              Marker(
+                markerId: const MarkerId('dropoff'),
+                position: dropoff,
+                icon: _dropoffIcon!,
+                anchor: const Offset(0.5, 0.5),
+              ),
+          },
         ),
       ),
     );
   }
-
-  Marker _pin(BuildContext context, LatLng point, Color color, IconData icon) => Marker(
-        point: point,
-        width: 28,
-        height: 28,
-        child: Container(
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2),
-          ),
-          child: Icon(icon, color: Colors.white, size: 14),
-        ),
-      );
 }
 
 class _DateTimeChip extends StatelessWidget {

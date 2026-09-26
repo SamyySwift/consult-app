@@ -20,9 +20,8 @@ dependencies:
   flutter_animate: ^4.5.0
   smooth_page_indicator: ^1.2.0
 
-  # Maps
-  flutter_map: ^7.0.2
-  latlong2: ^0.9.0
+  # Maps (Google Maps — key in android/local.properties and ios/Flutter/Secrets.xcconfig)
+  google_maps_flutter: ^2.18.1
 
   # Storage & Backend
   shared_preferences: ^2.3.3
