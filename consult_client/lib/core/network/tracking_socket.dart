@@ -10,12 +10,14 @@ class DriverLocationUpdate {
   final double lat;
   final double lng;
   final DateTime at;
+  final double? heading;
 
   const DriverLocationUpdate({
     required this.bookingId,
     required this.lat,
     required this.lng,
     required this.at,
+    this.heading,
   });
 }
 
@@ -121,6 +123,7 @@ class TrackingSocket {
               lat: lat,
               lng: lng,
               at: DateTime.tryParse(msg['at'] as String? ?? '') ?? DateTime.now(),
+              heading: (msg['heading'] as num?)?.toDouble(),
             ),
           );
         }

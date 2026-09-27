@@ -29,12 +29,21 @@ function send(client: TrackedClient, payload: Record<string, unknown>) {
  * Pushes a driver position to every authenticated socket subscribed to that booking.
  * Called by the driver location endpoint after the row is written.
  */
-export function broadcastDriverLocation(bookingId: string, lat: number, lng: number) {
+export function broadcastDriverLocation(
+  bookingId: string,
+  lat: number,
+  lng: number,
+  motion: { heading?: number; speed?: number } = {}
+) {
   const payload = JSON.stringify({
     type: 'driver_location',
     bookingId,
     lat,
     lng,
+    // Degrees clockwise from north; only sent while the driver is moving
+    heading: motion.heading,
+    // Metres per second
+    speed: motion.speed,
     at: new Date().toISOString(),
   });
 

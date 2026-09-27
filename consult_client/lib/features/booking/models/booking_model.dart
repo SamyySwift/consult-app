@@ -79,6 +79,8 @@ class BookingModel {
   final double? driverLng;
   /// When the driver's position was last reported.
   final DateTime? driverLocationAt;
+  /// Direction of travel in degrees clockwise from north, when moving.
+  final double? driverHeading;
 
   const BookingModel({
     required this.id,
@@ -102,9 +104,10 @@ class BookingModel {
     this.driverLat,
     this.driverLng,
     this.driverLocationAt,
+    this.driverHeading,
   });
 
-  BookingModel copyWithDriverLocation(double lat, double lng, DateTime at) => BookingModel(
+  BookingModel copyWithDriverLocation(double lat, double lng, DateTime at, {double? heading}) => BookingModel(
         id: id,
         userId: userId,
         vehicle: vehicle,
@@ -126,6 +129,7 @@ class BookingModel {
         driverLat: lat,
         driverLng: lng,
         driverLocationAt: at,
+        driverHeading: heading,
       );
 
   String get serviceName {

@@ -357,7 +357,7 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
         (Position? position) {
           if (position != null) {
             driverPosition.value = position;
-            _updateDriverLocation(jobId, position.latitude, position.longitude);
+            _updateDriverLocation(jobId, position);
           }
         },
         onError: (Object e) => debugPrint('Location stream error: $e'),
@@ -368,14 +368,17 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _updateDriverLocation(String jobId, double lat, double lng) async {
+  Future<void> _updateDriverLocation(String jobId, Position position) async {
     try {
       await ApiClient.instance.post('/api/driver/location', {
         'jobId': jobId,
-        'lat': lat,
-        'lng': lng,
+        'lat': position.latitude,
+        'lng': position.longitude,
+        // Heading is only meaningful while moving; phones report 0 or -1 when still
+        if (position.speed > 0.5 && position.heading >= 0) 'heading': position.heading,
+        'speed': position.speed,
       });
-      debugPrint('Updated driver location: $lat, $lng');
+      debugPrint('Updated driver location: ${position.latitude}, ${position.longitude}');
     } catch (e) {
       debugPrint('API _updateDriverLocation error: $e');
     }

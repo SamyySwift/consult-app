@@ -613,6 +613,10 @@ driverRouter.post('/jobs/:id/status', async (req: Request, res: Response): Promi
 driverRouter.post('/location', async (req: Request, res: Response): Promise<void> => {
   const driverId = extractDriverId(req);
   const { lat, lng, jobId } = req.body;
+  const finiteOrUndefined = (v: unknown) =>
+    v != null && Number.isFinite(Number(v)) ? Number(v) : undefined;
+  const heading = finiteOrUndefined(req.body.heading);
+  const speed = finiteOrUndefined(req.body.speed);
 
   if (lat == null || lng == null) {
     res.status(400).json({ error: 'Latitude and longitude are required' });
@@ -632,7 +636,10 @@ driverRouter.post('/location', async (req: Request, res: Response): Promise<void
         `UPDATE public.bookings SET driver_lat = $1, driver_lng = $2, driver_location_at = NOW(), updated_at = NOW() WHERE id = $3`,
         [lat, lng, jobId]
       );
-      broadcastDriverLocation(jobId, Number(lat), Number(lng));
+      broadcastDriverLocation(jobId, Number(lat), Number(lng), {
+        heading: heading != null && heading >= 0 && heading <= 360 ? heading : undefined,
+        speed: speed != null && speed >= 0 ? speed : undefined,
+      });
     }
 
     res.json({ success: true });
