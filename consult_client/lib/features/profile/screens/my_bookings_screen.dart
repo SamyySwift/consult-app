@@ -73,6 +73,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         final active = prov.activeBookings;
         final completed = prov.completedBookings;
 
+        // The shell's floating nav bar is included in this bottom padding
+        // (it uses extendBody), so this is the space the nav bar covers.
+        final navBarClearance = MediaQuery.paddingOf(context).bottom;
+
         return Scaffold(
           backgroundColor: Colors.black,
           body: Stack(
@@ -112,10 +116,17 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                   ),
                 ],
               ),
+              // Placed by hand rather than as the Scaffold's FAB: the Scaffold
+              // doesn't know about the floating nav bar and would put the
+              // button behind it.
+              Positioned(
+                right: 24,
+                bottom: navBarClearance + 12,
+                child: _NewBookingButton(
+                  onTap: () => context.push(AppConstants.routeBookingNew),
+                ),
+              ),
             ],
-          ),
-          floatingActionButton: _NewBookingButton(
-            onTap: () => context.push(AppConstants.routeBookingNew),
           ),
         );
       },
