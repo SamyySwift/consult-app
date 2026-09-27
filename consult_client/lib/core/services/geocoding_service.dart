@@ -28,6 +28,9 @@ class GeocodingService {
   static final GeocodingService instance = GeocodingService._();
 
   static const _photonUrl = 'https://photon.komoot.io';
+  // Photon rejects Dart's default "Dart/x.y (dart:io)" user agent with a 403;
+  // its usage policy asks apps to identify themselves.
+  static const _headers = {'User-Agent': 'CarpitalConsult/1.0 (com.carpitalconsult.app)'};
   // minLon,minLat,maxLon,maxLat — keeps results inside Nigeria
   static const _nigeriaBbox = '2.67,4.27,14.68,13.89';
   static const _timeout = Duration(seconds: 8);
@@ -99,7 +102,7 @@ class GeocodingService {
     PlaceResult? Function(dynamic) parse,
   ) async {
     try {
-      final res = await http.get(uri).timeout(_timeout);
+      final res = await http.get(uri, headers: _headers).timeout(_timeout);
       if (res.statusCode != 200) {
         debugPrint('Geocoding failed: HTTP ${res.statusCode} from ${uri.host}');
         return [];
