@@ -37,7 +37,8 @@ class ProofOfHandoverDocumentView extends StatelessWidget {
             child: Container(
               width: 800, // Fixed width for A4 aspect ratio feel
               constraints: const BoxConstraints(maxWidth: 800),
-              padding: const EdgeInsets.all(40),
+              // The paper is designed at 800px; phones need tighter margins
+              padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 20 : 40),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(4),
@@ -57,34 +58,39 @@ class ProofOfHandoverDocumentView extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'CARPITAL CONSULT INC.',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -1,
+                      // Expanded so the title and certificate number wrap
+                      // beside the QR code instead of running off the page
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'CARPITAL CONSULT INC.',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -1,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'PROOF OF HANDOVER / DELIVERY CERTIFICATE',
-                            style: TextStyle(
-                              color: Colors.black54,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.5,
+                            const SizedBox(height: 4),
+                            const Text(
+                              'PROOF OF HANDOVER / DELIVERY CERTIFICATE',
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.5,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          _InfoLabel('CERTIFICATE NO.', document.certificateNumber),
-                          const SizedBox(height: 8),
-                          _InfoLabel('HANDOVER DATE', document.formattedHandoverDate),
-                        ],
+                            const SizedBox(height: 16),
+                            _InfoLabel('CERTIFICATE NO.', document.certificateNumber),
+                            const SizedBox(height: 8),
+                            _InfoLabel('HANDOVER DATE', document.formattedHandoverDate),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 16),
                       QrImageView(
                         data: document.certificateNumber,
                         version: QrVersions.auto,

@@ -207,8 +207,9 @@ class _VehicleRecordCard extends StatelessWidget {
                               icon: Icons.description_outlined,
                               label: 'Order Waybill',
                               onTap: () {
-                                Navigator.push(
-                                  context,
+                                // Documents open over the whole app so the floating nav bar
+                                // doesn't cover them
+                                Navigator.of(context, rootNavigator: true).push(
                                   MaterialPageRoute(
                                     builder: (_) => OrderRequestDocumentView(
                                       document:
@@ -226,8 +227,9 @@ class _VehicleRecordCard extends StatelessWidget {
                               label: 'Handover POD',
                               color: context.colors.accent,
                               onTap: () {
-                                Navigator.push(
-                                  context,
+                                // Documents open over the whole app so the floating nav bar
+                                // doesn't cover them
+                                Navigator.of(context, rootNavigator: true).push(
                                   MaterialPageRoute(
                                     builder: (_) => ProofOfHandoverDocumentView(
                                       document:

@@ -408,8 +408,9 @@ class _BookingTile extends StatelessWidget {
                     ),
                     TapTarget(
                       onTap: () {
-                        Navigator.push(
-                          context,
+                        // Documents open over the whole app so the floating nav bar
+                        // doesn't cover them
+                        Navigator.of(context, rootNavigator: true).push(
                           MaterialPageRoute(
                             builder: (_) =>
                                 _WaybillViewerWrapper(booking: booking),

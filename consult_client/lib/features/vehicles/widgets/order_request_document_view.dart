@@ -37,7 +37,8 @@ class OrderRequestDocumentView extends StatelessWidget {
             child: Container(
               width: 800, // Fixed width for A4 aspect ratio feel
               constraints: const BoxConstraints(maxWidth: 800),
-              padding: const EdgeInsets.all(40),
+              // The paper is designed at 800px; phones need tighter margins
+              padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 20 : 40),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(4),
@@ -57,34 +58,39 @@ class OrderRequestDocumentView extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'CARPITAL CONSULT INC.',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -1,
+                      // Expanded so the title and certificate number wrap
+                      // beside the QR code instead of running off the page
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'CARPITAL CONSULT INC.',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -1,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'OFFICIAL TRANSPORT MANIFEST & WAYBILL',
-                            style: TextStyle(
-                              color: Colors.black54,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.5,
+                            const SizedBox(height: 4),
+                            const Text(
+                              'OFFICIAL TRANSPORT MANIFEST & WAYBILL',
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.5,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          _InfoLabel('DOCUMENT NO.', document.documentNumber),
-                          const SizedBox(height: 8),
-                          _InfoLabel('ISSUED DATE', document.formattedIssuedDate),
-                        ],
+                            const SizedBox(height: 16),
+                            _InfoLabel('DOCUMENT NO.', document.documentNumber),
+                            const SizedBox(height: 8),
+                            _InfoLabel('ISSUED DATE', document.formattedIssuedDate),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 16),
                       QrImageView(
                         data: document.documentNumber,
                         version: QrVersions.auto,
@@ -282,14 +288,17 @@ class _PriceRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: isTotal ? Colors.black : Colors.black87,
-              fontSize: isTotal ? 16 : 14,
-              fontWeight: isTotal ? FontWeight.w800 : FontWeight.w500,
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isTotal ? Colors.black : Colors.black87,
+                fontSize: isTotal ? 16 : 14,
+                fontWeight: isTotal ? FontWeight.w800 : FontWeight.w500,
+              ),
             ),
           ),
+          const SizedBox(width: 12),
           Text(
             amount,
             style: TextStyle(
