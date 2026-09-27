@@ -11,7 +11,7 @@ interface RoadRoute {
 }
 
 // Road routes rarely change, so each origin/destination pair is fetched from
-// Mapbox once and reused. Keys round to 4 decimals (~11 m).
+// TomTom once and reused. Keys round to 4 decimals (~11 m).
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 1000;
 const routeCache = new Map<string, { route: RoadRoute; at: number }>();
@@ -51,8 +51,8 @@ mapsRouter.get('/route', async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  const token = process.env.MAPBOX_TOKEN;
-  if (!token) {
+  const apiKey = process.env.TOMTOM_API_KEY;
+  if (!apiKey) {
     res.status(503).json({ error: 'Routing not configured' });
     return;
   }
@@ -65,25 +65,26 @@ mapsRouter.get('/route', async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
-    const coords = `${from[1]},${from[0]};${to[1]},${to[0]}`;
     const url =
-      `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}` +
-      `?geometries=geojson&overview=full&access_token=${encodeURIComponent(token)}`;
-    const mapboxRes = await fetch(url);
-    const body: any = await mapboxRes.json();
+      `https://api.tomtom.com/routing/1/calculateRoute/${from.join(',')}:${to.join(',')}/json` +
+      `?travelMode=car&traffic=true&key=${encodeURIComponent(apiKey)}`;
+    const tomtomRes = await fetch(url);
+    const body: any = await tomtomRes.json();
 
     const best = body?.routes?.[0];
-    if (!mapboxRes.ok || !best) {
-      console.error('Mapbox directions failed:', mapboxRes.status, body?.message ?? body?.code);
+    if (!tomtomRes.ok || !best) {
+      console.error('TomTom routing failed:', tomtomRes.status, body?.error?.description ?? body?.detailedError?.message);
       res.status(502).json({ error: 'No route found' });
       return;
     }
 
     const route: RoadRoute = {
-      // GeoJSON is [lng, lat]; the app works in [lat, lng].
-      coordinates: best.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]),
-      distance_m: best.distance,
-      duration_s: best.duration,
+      // A route with stops has one leg per stretch; join them into one line.
+      coordinates: best.legs.flatMap((leg: any) =>
+        leg.points.map((p: { latitude: number; longitude: number }) => [p.latitude, p.longitude]),
+      ),
+      distance_m: best.summary.lengthInMeters,
+      duration_s: best.summary.travelTimeInSeconds,
     };
 
     if (routeCache.size >= CACHE_MAX_ENTRIES) {

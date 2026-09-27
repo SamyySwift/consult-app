@@ -2,8 +2,9 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../booking/providers/booking_provider.dart';
@@ -12,7 +13,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/network/route_service.dart';
 import '../../../core/utils/formatters.dart';
-import '../../../core/utils/map_utils.dart';
+import '../../../core/widgets/base_map.dart';
 import '../../../core/widgets/glass.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/surface.dart';
@@ -95,7 +96,7 @@ class _TrackingContent extends StatefulWidget {
 class _TrackingContentState extends State<_TrackingContent> {
   static const _sheetMax = 0.88;
 
-  GoogleMapController? _mapController;
+  final MapController _mapController = MapController();
 
   /// Sheet height as a fraction of the screen, tracked separately so dragging
   /// the sheet only rebuilds the controls riding above it, not the map.
@@ -104,13 +105,7 @@ class _TrackingContentState extends State<_TrackingContent> {
   /// Collapsed sheet height, set each build from the screen and nav size.
   double _sheetMin = 0.3;
 
-  /// Map padding: the camera centres and fits within it, and the Google logo
-  /// sits at its bottom-left corner. Updated on each fit to match the sheet.
-  EdgeInsets? _mapPadding;
-
-  BitmapDescriptor? _pickupIcon;
-  BitmapDescriptor? _dropoffIcon;
-  BitmapDescriptor? _driverIcon;
+  bool _mapReady = false;
 
   /// Keep the camera on the driver as live positions arrive. Turned off as
   /// soon as the user pans the map themselves.
@@ -136,62 +131,9 @@ class _TrackingContentState extends State<_TrackingContent> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _loadIcons();
-  }
-
-  @override
   void dispose() {
     _sheetExtent.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadIcons() async {
-    final accent = context.colors.accent;
-    final pixelRatio = MediaQuery.devicePixelRatioOf(context);
-    final icons = await Future.wait([
-      MarkerIcons.circle(
-        size: 14,
-        pixelRatio: pixelRatio,
-        color: accent,
-        borderColor: Colors.black,
-        borderWidth: 2,
-        glow: accent.withValues(alpha: 0.7),
-        glowBlur: 10,
-        halo: accent.withValues(alpha: 0.25),
-        haloSize: 30,
-      ),
-      MarkerIcons.circle(
-        size: 40,
-        pixelRatio: pixelRatio,
-        color: const Color(0xFF1A1C1B),
-        borderColor: Colors.white.withValues(alpha: 0.35),
-        borderWidth: 1.5,
-        icon: Icons.location_on_rounded,
-        iconSize: 20,
-        glow: Colors.black.withValues(alpha: 0.5),
-        glowBlur: 8,
-      ),
-      MarkerIcons.circle(
-        size: 48,
-        pixelRatio: pixelRatio,
-        gradient: context.colors.accentGradient,
-        borderColor: Colors.black,
-        borderWidth: 2,
-        icon: Icons.local_shipping_rounded,
-        iconColor: Colors.black,
-        iconSize: 22,
-        glow: accent.withValues(alpha: 0.6),
-        glowBlur: 18,
-      ),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _pickupIcon = icons[0];
-      _dropoffIcon = icons[1];
-      _driverIcon = icons[2];
-    });
   }
 
   @override
@@ -212,8 +154,8 @@ class _TrackingContentState extends State<_TrackingContent> {
     final moved =
         oldWidget.booking.driverLat != widget.booking.driverLat ||
         oldWidget.booking.driverLng != widget.booking.driverLng;
-    if (moved && driver != null && _follow) {
-      _mapController?.animateCamera(CameraUpdate.newLatLng(driver));
+    if (moved && driver != null && _follow && _mapReady) {
+      _mapController.move(driver, _mapController.camera.zoom);
     }
   }
 
@@ -225,29 +167,28 @@ class _TrackingContentState extends State<_TrackingContent> {
     if (!_follow || _driver == null) _fitAll();
   }
 
-  /// The part of the map not covered by the header on top or the sheet at
-  /// the bottom.
+  /// The part of the map not covered by the header on top or the sheet and
+  /// floating controls at the bottom.
   EdgeInsets _visibleArea() {
     final size = MediaQuery.sizeOf(context);
     final top =
         MediaQuery.paddingOf(context).top +
-        90 +
+        130 +
         (widget.activeBookings.length > 1 ? 56 : 0);
-    final bottom = size.height * math.max(_sheetExtent.value, _sheetMin) + 12;
-    return EdgeInsets.fromLTRB(0, top, 0, bottom);
+    final bottom = size.height * math.max(_sheetExtent.value, _sheetMin) + 80;
+    return EdgeInsets.fromLTRB(40, top, 40, bottom);
   }
 
   void _fitAll() {
-    if (_mapController == null) return;
-    setState(() => _mapPadding = _visibleArea());
-    // After the rebuild, so the new padding reaches the map before the fit
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final controller = _mapController;
-      if (!mounted || controller == null) return;
-      final driver = _driver;
-      // The extra edge keeps the route clear of the controls above the sheet
-      fitPoints(controller, [_pickup, _dropoff, ?driver, ...?_route?.points], edge: 56);
-    });
+    if (!_mapReady) return;
+    final driver = _driver;
+    _mapController.fitCamera(
+      CameraFit.coordinates(
+        coordinates: [_pickup, _dropoff, ?driver, ...?_route?.points],
+        padding: _visibleArea(),
+        maxZoom: 15,
+      ),
+    );
   }
 
   void _showWholeRoute() {
@@ -255,16 +196,14 @@ class _TrackingContentState extends State<_TrackingContent> {
     _fitAll();
   }
 
-  Future<void> _followDriver() async {
+  void _followDriver() {
     final driver = _driver;
-    final controller = _mapController;
-    if (driver == null || controller == null) {
+    if (driver == null) {
       _fitAll();
       return;
     }
     setState(() => _follow = true);
-    final zoom = await controller.getZoomLevel();
-    await controller.animateCamera(CameraUpdate.newLatLngZoom(driver, math.max(zoom, 13)));
+    _mapController.move(driver, math.max(_mapController.camera.zoom, 13));
   }
 
   @override
@@ -291,35 +230,36 @@ class _TrackingContentState extends State<_TrackingContent> {
         children: [
           // ── Map ─────────────────────────────────────────────────
           Positioned.fill(
-            // The map doesn't say whether a camera move came from the user,
-            // so watch for a drag directly to stop following the driver.
-            child: Listener(
-              onPointerMove: (_) {
-                if (_follow) setState(() => _follow = false);
-              },
-              child: GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: LatLng(
-                    (_pickup.latitude + _dropoff.latitude) / 2,
-                    (_pickup.longitude + _dropoff.longitude) / 2,
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCameraFit: CameraFit.coordinates(
+                  coordinates: [_pickup, _dropoff, ?driver],
+                  padding: EdgeInsets.fromLTRB(
+                    40,
+                    200,
+                    40,
+                    screenHeight * sheetMin + 80,
                   ),
-                  zoom: 11,
+                  maxZoom: 15,
                 ),
-                style: darkMapStyle,
-                padding: _mapPadding ?? _visibleArea(),
-                rotateGesturesEnabled: false,
-                tiltGesturesEnabled: false,
-                zoomControlsEnabled: false,
-                myLocationButtonEnabled: false,
-                mapToolbarEnabled: false,
-                compassEnabled: false,
-                onMapCreated: (controller) {
-                  _mapController = controller;
-                  _fitAll();
+                backgroundColor: const Color(0xFF0E0F0F),
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                ),
+                onMapReady: () {
+                  _mapReady = true;
+                  if (_route != null) _fitAll();
                 },
-                polylines: _polylines(routeIndex),
-                markers: _markers(),
+                onPositionChanged: (camera, hasGesture) {
+                  if (hasGesture && _follow) setState(() => _follow = false);
+                },
               ),
+              children: [
+                baseMapTiles(dark: true),
+                PolylineLayer(polylines: _polylines(routeIndex)),
+                MarkerLayer(markers: _markers()),
+              ],
             ),
           ),
 
@@ -405,6 +345,20 @@ class _TrackingContentState extends State<_TrackingContent> {
                             ],
                           ),
                         ),
+                        Positioned(
+                          left: 16,
+                          bottom: bottom,
+                          child: Text(
+                            mapAttribution,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.white.withValues(alpha: 0.6),
+                              shadows: [
+                                Shadow(color: Colors.black, blurRadius: 4),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -452,17 +406,16 @@ class _TrackingContentState extends State<_TrackingContent> {
     );
   }
 
-  Set<Polyline> _polylines(int? routeIndex) {
+  List<Polyline> _polylines(int? routeIndex) {
     final accent = context.colors.accent;
     final driver = _driver;
     final route = _route;
-    final dashed = [PatternItem.dash(10), PatternItem.gap(8)];
+    final dashed = StrokePattern.dashed(segments: [10, 8]);
 
     if (route == null) {
       // No road route yet (or routing unavailable): straight dashed legs.
-      return {
+      return [
         Polyline(
-          polylineId: const PolylineId('straight'),
           points: [
             if (!_afterPickup) ?driver,
             _pickup,
@@ -470,10 +423,10 @@ class _TrackingContentState extends State<_TrackingContent> {
             _dropoff,
           ],
           color: accent.withValues(alpha: 0.8),
-          width: 3,
-          patterns: dashed,
+          strokeWidth: 3,
+          pattern: dashed,
         ),
-      };
+      ];
     }
 
     // Split at the driver once they're on the pickup → drop-off leg, so the
@@ -482,66 +435,101 @@ class _TrackingContentState extends State<_TrackingContent> {
     final driven = route.points.sublist(0, split + 1);
     final remaining = route.points.sublist(split);
 
-    return {
+    return [
       if (driven.length > 1)
         Polyline(
-          polylineId: const PolylineId('driven'),
           points: driven,
           color: Colors.white.withValues(alpha: 0.35),
-          width: 4,
+          strokeWidth: 4,
         ),
       Polyline(
-        polylineId: const PolylineId('remaining-glow'),
         points: remaining,
         color: accent.withValues(alpha: 0.22),
-        width: 14,
-        zIndex: 1,
+        strokeWidth: 14,
       ),
-      Polyline(
-        polylineId: const PolylineId('remaining'),
-        points: remaining,
-        color: accent,
-        width: 4,
-        zIndex: 2,
-      ),
+      Polyline(points: remaining, color: accent, strokeWidth: 4),
       if (!_afterPickup && driver != null)
         Polyline(
-          polylineId: const PolylineId('to-pickup'),
           points: [driver, _pickup],
           color: Colors.white.withValues(alpha: 0.7),
-          width: 3,
-          patterns: dashed,
-          zIndex: 3,
+          strokeWidth: 3,
+          pattern: dashed,
         ),
-    };
+    ];
   }
 
-  Set<Marker> _markers() {
+  List<Marker> _markers() {
+    final accent = context.colors.accent;
     final driver = _driver;
-    return {
-      if (_pickupIcon != null)
-        Marker(
-          markerId: const MarkerId('pickup'),
-          position: _pickup,
-          icon: _pickupIcon!,
-          anchor: const Offset(0.5, 0.5),
+    return [
+      Marker(
+        point: _pickup,
+        width: 30,
+        height: 30,
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: accent.withValues(alpha: 0.25),
+          ),
+          alignment: Alignment.center,
+          child: Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: accent,
+              border: Border.all(color: Colors.black, width: 2),
+              boxShadow: [
+                BoxShadow(color: accent.withValues(alpha: 0.7), blurRadius: 10),
+              ],
+            ),
+          ),
         ),
-      if (_dropoffIcon != null)
-        Marker(
-          markerId: const MarkerId('dropoff'),
-          position: _dropoff,
-          icon: _dropoffIcon!,
-          anchor: const Offset(0.5, 0.5),
+      ),
+      Marker(
+        point: _dropoff,
+        width: 40,
+        height: 40,
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF1A1C1B),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.35),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 8,
+              ),
+            ],
+          ),
+          child: Icon(Icons.location_on_rounded, color: Colors.white, size: 20),
         ),
-      if (driver != null && _driverIcon != null)
+      ),
+      if (driver != null)
         Marker(
-          markerId: const MarkerId('driver'),
-          position: driver,
-          icon: _driverIcon!,
-          anchor: const Offset(0.5, 0.5),
-          zIndexInt: 1,
+          point: driver,
+          width: 48,
+          height: 48,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: context.colors.accentGradient,
+              border: Border.all(color: Colors.black, width: 2),
+              boxShadow: [
+                BoxShadow(color: accent.withValues(alpha: 0.6), blurRadius: 18),
+              ],
+            ),
+            child: Icon(
+              Icons.local_shipping_rounded,
+              color: Colors.black,
+              size: 22,
+            ),
+          ),
         ),
-    };
+    ];
   }
 
   Widget _bookingChips() {
@@ -891,7 +879,13 @@ class _LiveProgressCard extends StatelessWidget {
         booking.status == BookingStatusEnum.pending ||
         booking.status == BookingStatusEnum.confirmed;
     final target = headingToPickup ? booking.pickup : booking.dropoff;
-    final km = metersBetween(LatLng(lat, lng), LatLng(target.lat, target.lng)) / 1000;
+    final km =
+        const Distance().as(
+          LengthUnit.Meter,
+          LatLng(lat, lng),
+          LatLng(target.lat, target.lng),
+        ) /
+        1000;
     final route = this.route;
     final routeIndex = this.routeIndex;
     final onRoute = !headingToPickup && route != null && routeIndex != null;

@@ -43,6 +43,14 @@ class AppConstants {
   static String get wsBaseUrl =>
       apiBaseUrl.replaceFirst(RegExp(r'^http'), 'ws');
 
+  /// TomTom API key for map tiles and address search. Null when not
+  /// configured, in which case maps use OpenStreetMap tiles and search uses
+  /// Photon.
+  static String? get tomtomApiKey {
+    final key = dotenv.isInitialized ? dotenv.env['TOMTOM_API_KEY'] : null;
+    return (key == null || key.isEmpty) ? null : key;
+  }
+
   // Supabase Configuration
   static const String supabaseUrl = 'https://ulksjcitenlxtvxwvktw.supabase.co';
   static String get supabaseAnonKey =>

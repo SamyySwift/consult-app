@@ -1,6 +1,5 @@
 import 'dart:math' as math;
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import '../utils/map_utils.dart';
+import 'package:latlong2/latlong.dart';
 import 'api_client.dart';
 
 /// A driving route that follows the road network.
@@ -19,9 +18,11 @@ class RoadRoute {
   });
 
   static List<double> _accumulate(List<LatLng> points) {
+    const distance = Distance();
     final out = List<double>.filled(points.length, 0);
     for (var i = 1; i < points.length; i++) {
-      out[i] = out[i - 1] + metersBetween(points[i - 1], points[i]);
+      out[i] =
+          out[i - 1] + distance.as(LengthUnit.Meter, points[i - 1], points[i]);
     }
     return out;
   }
@@ -30,7 +31,7 @@ class RoadRoute {
   int nearestIndex(LatLng p) {
     // Squared equirectangular distance: accurate enough to pick the nearest
     // point and far cheaper than haversine over thousands of points.
-    final cosLat = math.cos(p.latitude * math.pi / 180);
+    final cosLat = math.cos(p.latitudeInRad);
     var best = 0;
     var bestD = double.infinity;
     for (var i = 0; i < points.length; i++) {
