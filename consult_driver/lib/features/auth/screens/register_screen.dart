@@ -29,6 +29,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  // 0: name, email, phone; 1: company and password
+  int _step = 0;
 
   // Partner companies a driver can drive for, managed in the admin dashboard
   List<({String id, String name})>? _partners;
@@ -112,27 +114,59 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  Widget _buildCompanyPicker() {
-    final label = Padding(
-      padding: const EdgeInsets.only(left: 6),
-      child: Text(
-        'Company You Drive For',
-        style: GoogleFonts.inter(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: Colors.white.withValues(alpha: 0.75),
-        ),
-      ),
-    );
+  /// Validates the details on step 1, then moves on to company and password.
+  void _goToAccountStep() {
+    if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _step = 1);
+  }
 
+  void _handleBack() {
+    if (_step == 1) {
+      FocusScope.of(context).unfocus();
+      setState(() => _step = 0);
+    } else {
+      context.go(AppRoutes.login);
+    }
+  }
+
+  Future<void> _pickCompany() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: DriverColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (_) => _CompanySheet(partners: _partners!, selectedId: _partnerId),
+    );
+    if (picked != null) setState(() => _partnerId = picked);
+  }
+
+  Widget _fieldLabel(String text) => Padding(
+        padding: const EdgeInsets.only(left: 6),
+        child: Text(
+          text,
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.white.withValues(alpha: 0.75),
+          ),
+        ),
+      );
+
+  Widget _buildCompanyPicker() {
     Widget field;
     if (_partnersLoading) {
       field = const InputDecorator(
         decoration: InputDecoration(
           prefixIcon: Icon(Icons.business_outlined, color: DriverColors.textSecondary, size: 20),
-          hintText: 'Loading companies…',
         ),
-        child: SizedBox(height: 20, child: Align(alignment: Alignment.centerLeft, child: SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)))),
+        child: Row(
+          children: [
+            SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(width: 10),
+            Text('Loading companies…', style: TextStyle(color: DriverColors.textLight, fontSize: 14)),
+          ],
+        ),
       );
     } else if (_partnersFailed) {
       field = _PickerNotice(
@@ -145,40 +179,173 @@ class _RegisterScreenState extends State<RegisterScreen> {
         text: 'No partner companies are available yet, so sign-up is closed. Please contact support.',
       );
     } else {
-      field = DropdownButtonFormField<String>(
+      // A field styled like the text inputs that opens a bottom sheet list,
+      // rather than a dropdown whose menu doesn't match the rounded fields.
+      field = FormField<String>(
+        key: ValueKey(_partnerId),
         initialValue: _partnerId,
-        isExpanded: true,
-        dropdownColor: DriverColors.surface,
-        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: DriverColors.textSecondary),
-        style: GoogleFonts.inter(fontSize: 15, color: DriverColors.textPrimary, fontWeight: FontWeight.w500),
-        decoration: const InputDecoration(
-          hintText: 'Select your company',
-          prefixIcon: Icon(Icons.business_outlined, color: DriverColors.textSecondary, size: 20),
-        ),
-        items: [
-          for (final p in _partners!)
-            DropdownMenuItem(value: p.id, child: Text(p.name, overflow: TextOverflow.ellipsis)),
-        ],
-        onChanged: (id) => setState(() => _partnerId = id),
         validator: (id) => id == null ? 'Please select the company you drive for' : null,
+        builder: (state) {
+          final selected = _partners!.where((p) => p.id == _partnerId).firstOrNull;
+          return Semantics(
+            button: true,
+            label: 'Company you drive for',
+            value: selected?.name,
+            child: TapTarget(
+              onTap: _pickCompany,
+              child: InputDecorator(
+                isEmpty: selected == null,
+                decoration: InputDecoration(
+                  hintText: 'Select your company',
+                  errorText: state.errorText,
+                  prefixIcon: const Icon(Icons.business_outlined, color: DriverColors.textSecondary, size: 20),
+                  suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded, color: DriverColors.textSecondary),
+                ),
+                child: Text(
+                  selected?.name ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(fontSize: 15, color: DriverColors.textPrimary, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ),
+          );
+        },
       );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [label, const SizedBox(height: 8), field],
+      children: [_fieldLabel('Company You Drive For'), const SizedBox(height: 8), field],
+    );
+  }
+
+  Widget _buildStepIndicator() {
+    const titles = ['Your details', 'Your account'];
+    return Column(
+      children: [
+        Row(
+          children: [
+            for (var i = 0; i < 2; i++) ...[
+              if (i > 0) const SizedBox(width: 6),
+              Expanded(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: i <= _step ? DriverColors.accent : Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Step ${_step + 1} of 2 · ${titles[_step]}',
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailsStep() {
+    return Column(
+      key: const ValueKey('details'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: DriverTextField(
+                label: 'First Name',
+                hint: 'John',
+                controller: _firstNameController,
+                validator: (v) => AppValidators.validateRequired(v, field: 'First name'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DriverTextField(
+                label: 'Last Name',
+                hint: 'Doe',
+                controller: _lastNameController,
+                validator: (v) => AppValidators.validateRequired(v, field: 'Last name'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        DriverTextField(
+          label: 'Email Address',
+          hint: 'driver@consultlogistics.com',
+          prefixIcon: Icons.email_outlined,
+          keyboardType: TextInputType.emailAddress,
+          controller: _emailController,
+          validator: AppValidators.validateEmail,
+        ),
+        const SizedBox(height: 20),
+        DriverTextField(
+          label: 'Phone Number',
+          hint: '0801 234 5678',
+          prefixIcon: Icons.phone_outlined,
+          keyboardType: TextInputType.phone,
+          controller: _phoneController,
+          validator: AppValidators.validatePhone,
+          textInputAction: TextInputAction.done,
+        ),
+        const SizedBox(height: 32),
+        DriverButton(label: 'Continue', onPressed: _goToAccountStep),
+      ],
+    );
+  }
+
+  Widget _buildAccountStep(AuthProvider auth) {
+    // Sign-up needs a company, so it's blocked until one can be chosen
+    final canSubmit = _partners != null && _partners!.isNotEmpty;
+
+    return Column(
+      key: const ValueKey('account'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildCompanyPicker(),
+        const SizedBox(height: 20),
+        DriverTextField(
+          label: 'Security Password',
+          hint: 'Create a password',
+          prefixIcon: Icons.lock_outline_rounded,
+          obscureText: _obscurePassword,
+          controller: _passwordController,
+          validator: AppValidators.validatePassword,
+          textInputAction: TextInputAction.done,
+          suffixIcon: IconButton(
+            icon: Icon(
+              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              color: const Color(0xFF777777),
+              size: 20,
+            ),
+            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+          ),
+        ),
+        const SizedBox(height: 32),
+        DriverButton(
+          label: 'Submit Application',
+          onPressed: canSubmit ? _handleRegister : null,
+          isLoading: auth.isLoading,
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    // Sign-up needs a company, so it's blocked until one can be chosen
-    final canSubmit = _partners != null && _partners!.isNotEmpty;
 
     return AuthSheetLayout(
       sheetHeight: 0.8,
-      onBack: () => context.go(AppRoutes.login),
+      onBack: _handleBack,
       child: Form(
         key: _formKey,
         child: Column(
@@ -198,97 +365,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 6),
 
             Text(
-              'Enter your credentials to join our logistics network. Approved within 24 hours.',
+              'Join our logistics network. Approved within 24 hours.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white.withValues(alpha: 0.6), height: 1.4, fontSize: 14),
             ).motionAware(context).fadeIn().slideY(begin: 0.1),
 
+            const SizedBox(height: 20),
+
+            _buildStepIndicator(),
+
             const SizedBox(height: 24),
 
-            const Padding(
-              padding: EdgeInsets.only(left: 6, bottom: 12),
-              child: Text(
-                'Personal Information',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white),
+            AnimatedSwitcher(
+              duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 250),
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween(begin: const Offset(0.04, 0), end: Offset.zero).animate(animation),
+                  child: child,
+                ),
               ),
+              child: _step == 0 ? _buildDetailsStep() : _buildAccountStep(auth),
             ),
-
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: DriverTextField(
-                    label: 'First Name',
-                    hint: 'John',
-                    controller: _firstNameController,
-                    validator: (v) => AppValidators.validateRequired(v, field: 'First name'),
-                  ).motionAware(context, delay: 100.ms).fadeIn().slideY(),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DriverTextField(
-                    label: 'Last Name',
-                    hint: 'Doe',
-                    controller: _lastNameController,
-                    validator: (v) => AppValidators.validateRequired(v, field: 'Last name'),
-                  ).motionAware(context, delay: 150.ms).fadeIn().slideY(),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 18),
-
-            DriverTextField(
-              label: 'Email Address',
-              hint: 'driver@consultlogistics.com',
-              prefixIcon: Icons.email_outlined,
-              keyboardType: TextInputType.emailAddress,
-              controller: _emailController,
-              validator: AppValidators.validateEmail,
-            ).motionAware(context, delay: 200.ms).fadeIn().slideY(),
-
-            const SizedBox(height: 18),
-
-            DriverTextField(
-              label: 'Phone Number',
-              hint: '+44 7700 900077',
-              prefixIcon: Icons.phone_outlined,
-              keyboardType: TextInputType.phone,
-              controller: _phoneController,
-              validator: AppValidators.validatePhone,
-            ).motionAware(context, delay: 250.ms).fadeIn().slideY(),
-
-            const SizedBox(height: 18),
-
-            _buildCompanyPicker().motionAware(context, delay: 275.ms).fadeIn().slideY(),
-
-            const SizedBox(height: 18),
-
-            DriverTextField(
-              label: 'Security Password',
-              hint: 'Create a password',
-              prefixIcon: Icons.lock_outline_rounded,
-              obscureText: _obscurePassword,
-              controller: _passwordController,
-              validator: AppValidators.validatePassword,
-              textInputAction: TextInputAction.done,
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                  color: const Color(0xFF777777),
-                  size: 20,
-                ),
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-              ),
-            ).motionAware(context, delay: 300.ms).fadeIn().slideY(),
-
-            const SizedBox(height: 30),
-
-            DriverButton(
-              label: 'Submit Application',
-              onPressed: canSubmit ? _handleRegister : null,
-              isLoading: auth.isLoading,
-            ).motionAware(context, delay: 400.ms).fadeIn().scale(),
 
             const SizedBox(height: 18),
 
@@ -306,6 +404,112 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet listing partner companies, with search once the list is long.
+class _CompanySheet extends StatefulWidget {
+  final List<({String id, String name})> partners;
+  final String? selectedId;
+
+  const _CompanySheet({required this.partners, this.selectedId});
+
+  @override
+  State<_CompanySheet> createState() => _CompanySheetState();
+}
+
+class _CompanySheetState extends State<_CompanySheet> {
+  static const _searchThreshold = 8;
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _query.trim().toLowerCase();
+    final shown = q.isEmpty
+        ? widget.partners
+        : widget.partners.where((p) => p.name.toLowerCase().contains(q)).toList();
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.7),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 10),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(24, 18, 24, 12),
+                child: Text(
+                  'Company you drive for',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ),
+              if (widget.partners.length > _searchThreshold)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: TextField(
+                    autofocus: false,
+                    onChanged: (v) => setState(() => _query = v),
+                    style: const TextStyle(color: DriverColors.textPrimary),
+                    decoration: const InputDecoration(
+                      hintText: 'Search companies',
+                      prefixIcon: Icon(Icons.search_rounded, color: DriverColors.textSecondary, size: 20),
+                    ),
+                  ),
+                ),
+              Flexible(
+                child: shown.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text('No companies match your search.', style: TextStyle(color: DriverColors.textSecondary)),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        itemCount: shown.length,
+                        itemBuilder: (context, i) {
+                          final p = shown[i];
+                          final selected = p.id == widget.selectedId;
+                          return ListTile(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            leading: Icon(
+                              Icons.business_outlined,
+                              color: selected ? DriverColors.accent : DriverColors.textSecondary,
+                            ),
+                            title: Text(
+                              p.name,
+                              style: TextStyle(
+                                color: DriverColors.textPrimary,
+                                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                              ),
+                            ),
+                            trailing: selected
+                                ? const Icon(Icons.check_circle_rounded, color: DriverColors.accent)
+                                : null,
+                            selected: selected,
+                            selectedTileColor: DriverColors.accent.withValues(alpha: 0.08),
+                            onTap: () => Navigator.of(context).pop(p.id),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
