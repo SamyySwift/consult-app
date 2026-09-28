@@ -294,12 +294,17 @@ class _Step1VehicleDetailsState extends State<Step1VehicleDetails> {
 
             SizedBox(height: 6),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Found on the dashboard or door frame of your vehicle',
-                  style: TextStyle(fontSize: 12, color: context.colors.textLight),
+                // Expanded so the hint wraps instead of pushing the counter
+                // off-screen once it reaches two digits
+                Expanded(
+                  child: Text(
+                    'Found on the dashboard or door frame of your vehicle',
+                    style: TextStyle(fontSize: 12, color: context.colors.textLight),
+                  ),
                 ),
+                SizedBox(width: 8),
                 Text(
                   '$_vinLength / 17',
                   style: TextStyle(
