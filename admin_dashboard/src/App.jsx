@@ -6,6 +6,7 @@ import { DispatchView } from './views/DispatchView';
 import { JobsView } from './views/JobsView';
 import { DriversView } from './views/DriversView';
 import { ClientsView } from './views/ClientsView';
+import { PartnersView } from './views/PartnersView';
 import { SettingsView } from './views/SettingsView';
 import { DetailDrawer } from './components/DetailDrawer';
 
@@ -20,6 +21,8 @@ function AppContent() {
         return <JobsView />;
       case 'drivers':
         return <DriversView />;
+      case 'partners':
+        return <PartnersView />;
       case 'clients':
         return <ClientsView />;
       case 'earnings':
@@ -36,6 +39,7 @@ function AppContent() {
       dispatch: 'Command Centre',
       jobs: 'Master Transport Log',
       drivers: 'Driver Management',
+      partners: 'Partners & Affiliations',
       clients: 'Client Management',
       earnings: 'Financial Overview',
       settings: 'Pricing Configuration'
@@ -48,6 +52,7 @@ function AppContent() {
       dispatch: 'Dispatch',
       jobs: 'Jobs',
       drivers: 'Drivers',
+      partners: 'Partners',
       clients: 'Clients',
       earnings: 'Earnings',
       settings: 'Settings'

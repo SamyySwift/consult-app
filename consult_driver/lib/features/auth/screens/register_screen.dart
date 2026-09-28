@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/utils/motion.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/driver_colors.dart';
 import '../../../core/widgets/tap_target.dart';
 import '../../../core/widgets/driver_button.dart';
@@ -28,6 +30,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
+  // Partner companies a driver can drive for, managed in the admin dashboard
+  List<({String id, String name})>? _partners;
+  bool _partnersLoading = true;
+  bool _partnersFailed = false;
+  String? _partnerId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPartners();
+  }
+
+  Future<void> _loadPartners() async {
+    setState(() {
+      _partnersLoading = true;
+      _partnersFailed = false;
+    });
+    final res = await ApiClient.instance.get('/api/driver/partners');
+    if (!mounted) return;
+    setState(() {
+      _partnersLoading = false;
+      if (res.isSuccess && res.data is List) {
+        _partners = [
+          for (final p in res.data as List)
+            if (p is Map && p['id'] != null && p['name'] != null)
+              (id: p['id'].toString(), name: p['name'].toString()),
+        ];
+        // Drop a selection that's no longer offered
+        if (_partners!.every((p) => p.id != _partnerId)) _partnerId = null;
+      } else {
+        _partnersFailed = true;
+      }
+    });
+  }
+
   @override
   void dispose() {
     _firstNameController.dispose();
@@ -48,9 +85,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       email: _emailController.text.trim(),
       phone: _phoneController.text.trim(),
       password: _passwordController.text,
+      partnerId: _partnerId!,
     );
 
     if (!mounted) return;
+
+    if (!success && (auth.errorMessage ?? '').contains('no longer available')) {
+      // The admin deactivated the chosen company while the form was open
+      _loadPartners();
+    }
 
     if (success) {
       if (auth.needsOtp) {
@@ -69,9 +112,69 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  Widget _buildCompanyPicker() {
+    final label = Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: Text(
+        'Company You Drive For',
+        style: GoogleFonts.inter(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: Colors.white.withValues(alpha: 0.75),
+        ),
+      ),
+    );
+
+    Widget field;
+    if (_partnersLoading) {
+      field = const InputDecorator(
+        decoration: InputDecoration(
+          prefixIcon: Icon(Icons.business_outlined, color: DriverColors.textSecondary, size: 20),
+          hintText: 'Loading companies…',
+        ),
+        child: SizedBox(height: 20, child: Align(alignment: Alignment.centerLeft, child: SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)))),
+      );
+    } else if (_partnersFailed) {
+      field = _PickerNotice(
+        text: "Couldn't load companies. Check your connection.",
+        actionLabel: 'Retry',
+        onAction: _loadPartners,
+      );
+    } else if (_partners!.isEmpty) {
+      field = const _PickerNotice(
+        text: 'No partner companies are available yet, so sign-up is closed. Please contact support.',
+      );
+    } else {
+      field = DropdownButtonFormField<String>(
+        initialValue: _partnerId,
+        isExpanded: true,
+        dropdownColor: DriverColors.surface,
+        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: DriverColors.textSecondary),
+        style: GoogleFonts.inter(fontSize: 15, color: DriverColors.textPrimary, fontWeight: FontWeight.w500),
+        decoration: const InputDecoration(
+          hintText: 'Select your company',
+          prefixIcon: Icon(Icons.business_outlined, color: DriverColors.textSecondary, size: 20),
+        ),
+        items: [
+          for (final p in _partners!)
+            DropdownMenuItem(value: p.id, child: Text(p.name, overflow: TextOverflow.ellipsis)),
+        ],
+        onChanged: (id) => setState(() => _partnerId = id),
+        validator: (id) => id == null ? 'Please select the company you drive for' : null,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [label, const SizedBox(height: 8), field],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    // Sign-up needs a company, so it's blocked until one can be chosen
+    final canSubmit = _partners != null && _partners!.isNotEmpty;
 
     return AuthSheetLayout(
       sheetHeight: 0.8,
@@ -157,6 +260,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
             const SizedBox(height: 18),
 
+            _buildCompanyPicker().motionAware(context, delay: 275.ms).fadeIn().slideY(),
+
+            const SizedBox(height: 18),
+
             DriverTextField(
               label: 'Security Password',
               hint: 'Create a password',
@@ -179,7 +286,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
             DriverButton(
               label: 'Submit Application',
-              onPressed: _handleRegister,
+              onPressed: canSubmit ? _handleRegister : null,
               isLoading: auth.isLoading,
             ).motionAware(context, delay: 400.ms).fadeIn().scale(),
 
@@ -200,6 +307,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Stands in for the company dropdown when there's nothing to choose from.
+class _PickerNotice extends StatelessWidget {
+  final String text;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const _PickerNotice({required this.text, this.actionLabel, this.onAction});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      decoration: BoxDecoration(
+        color: DriverColors.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: DriverColors.warning.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, color: DriverColors.warning, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text, style: const TextStyle(color: DriverColors.textPrimary, fontSize: 13, height: 1.35)),
+          ),
+          if (actionLabel != null)
+            TextButton(
+              onPressed: onAction,
+              child: Text(actionLabel!, style: const TextStyle(color: DriverColors.accent, fontWeight: FontWeight.w700)),
+            ),
+        ],
       ),
     );
   }

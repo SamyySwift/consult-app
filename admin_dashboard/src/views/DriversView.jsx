@@ -15,6 +15,7 @@ export function DriversView() {
         id: d.id,
         name: d.full_name || '—',
         phone: d.phone || '—',
+        company: d.partner_name || null,
         activeJobs: 0,
         completedJobs: 0,
         totalEarnings: 0,
@@ -30,6 +31,7 @@ export function DriversView() {
           id: job.driverId,
           name: job.driverName || 'Unknown Driver',
           phone: '—',
+          company: null,
           activeJobs: 0,
           completedJobs: 0,
           totalEarnings: 0,
@@ -53,7 +55,10 @@ export function DriversView() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return enrichedDrivers.filter(d =>
-      !q || d.name.toLowerCase().includes(q) || d.phone.toLowerCase().includes(q)
+      !q ||
+      d.name.toLowerCase().includes(q) ||
+      d.phone.toLowerCase().includes(q) ||
+      (d.company || '').toLowerCase().includes(q)
     );
   }, [enrichedDrivers, search]);
 
@@ -78,7 +83,7 @@ export function DriversView() {
           </svg>
           <input
             type="text"
-            placeholder="Search by name or phone…"
+            placeholder="Search by name, phone or company…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-64 pl-9 pr-4 py-2 bg-navy-mid border border-navy-border rounded-lg text-[13px] text-text-primary placeholder:text-text-dim focus:outline-none focus:border-info transition-colors"
@@ -109,6 +114,7 @@ export function DriversView() {
             <tr className="text-[11px] uppercase tracking-[0.05em] text-text-mid">
               <th className="px-4 py-3 font-medium">Driver</th>
               <th className="px-4 py-3 font-medium">Phone</th>
+              <th className="px-4 py-3 font-medium">Company</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Active Jobs</th>
               <th className="px-4 py-3 font-medium">Completed</th>
@@ -118,7 +124,7 @@ export function DriversView() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-16 text-text-dim text-[13px]">
+                <td colSpan={7} className="text-center py-16 text-text-dim text-[13px]">
                   {search ? 'No drivers match your search.' : 'No drivers found.'}
                 </td>
               </tr>
@@ -134,6 +140,9 @@ export function DriversView() {
                     </div>
                   </td>
                   <td className="px-4 py-3.5 font-mono text-[12px] text-text-mid">{driver.phone}</td>
+                  <td className="px-4 py-3.5 text-[13px] text-text-primary">
+                    {driver.company || <span className="text-text-dim">Not set</span>}
+                  </td>
                   <td className="px-4 py-3.5">
                     <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-[0.05em] flex items-center gap-1.5 w-fit ${
                       driver.status === 'active' ? 'bg-amber-glow text-amber' : 'bg-success-bg text-success'

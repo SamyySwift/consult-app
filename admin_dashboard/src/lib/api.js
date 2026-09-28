@@ -97,3 +97,47 @@ export async function fetchStats() {
   }
   return res.json();
 }
+
+export async function fetchPartners() {
+  const res = await fetch(`${API_BASE_URL}/api/admin/partners`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch partners (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function createPartner(partner) {
+  const res = await fetch(`${API_BASE_URL}/api/admin/partners`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(partner),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to create partner (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function updatePartner(id, changes) {
+  const res = await fetch(`${API_BASE_URL}/api/admin/partners/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(changes),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to update partner (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function fetchPartnerDrivers(id) {
+  const res = await fetch(`${API_BASE_URL}/api/admin/partners/${encodeURIComponent(id)}/drivers`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch partner drivers (${res.status})`);
+  }
+  return res.json();
+}

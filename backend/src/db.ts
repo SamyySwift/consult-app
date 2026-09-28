@@ -170,6 +170,24 @@ export async function initDatabase() {
       VALUES ('insurance_percentage', '1.5')
       ON CONFLICT (key) DO NOTHING;
 
+      -- Partner companies drivers can work for (managed by admins)
+      CREATE TABLE IF NOT EXISTS public.partners (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL,
+        contact_name TEXT DEFAULT '',
+        contact_phone TEXT DEFAULT '',
+        contact_email TEXT DEFAULT '',
+        address TEXT DEFAULT '',
+        registration_number TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      -- Company a driver drives for; kept when a partner is deactivated
+      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS partner_id UUID REFERENCES public.partners(id) ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS idx_users_partner_id ON public.users(partner_id);
+
       CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON public.bookings(user_id);
       CREATE INDEX IF NOT EXISTS idx_bookings_driver_id ON public.bookings(driver_id);
       CREATE INDEX IF NOT EXISTS idx_bookings_status ON public.bookings(status);

@@ -120,19 +120,48 @@ driverRouter.post('/login', async (req: Request, res: Response): Promise<void> =
 });
 
 // -------------------------------------------------------------
+// GET /api/driver/partners - Active partner companies for the sign-up form
+// -------------------------------------------------------------
+driverRouter.get('/partners', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name FROM public.partners WHERE is_active = TRUE ORDER BY name ASC'
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    console.error('Error fetching partners for sign-up:', err);
+    res.status(500).json({ error: 'Failed to load partner companies' });
+  }
+});
+
+// -------------------------------------------------------------
 // POST /api/driver/register - Driver Registration (Sends OTP)
 // -------------------------------------------------------------
 driverRouter.post('/register', async (req: Request, res: Response): Promise<void> => {
   const { firstName, lastName, email, phone, password, licenseNumber, vehicleType, vehiclePlate } = req.body;
+  const partnerId = req.body.partnerId ?? req.body.partner_id;
 
   if (!email || !password || !firstName) {
     res.status(400).json({ error: 'Name, email, and password are required' });
+    return;
+  }
+  if (!partnerId) {
+    res.status(400).json({ error: 'Please select the company you drive for' });
     return;
   }
 
   const cleanEmail = email.trim().toLowerCase();
 
   try {
+    const partner = await pool.query(
+      'SELECT id FROM public.partners WHERE id::text = $1 AND is_active = TRUE',
+      [String(partnerId)]
+    );
+    if (partner.rows.length === 0) {
+      res.status(400).json({ error: 'The selected company is no longer available. Please choose another.' });
+      return;
+    }
+
     const existing = await pool.query('SELECT id, is_verified FROM public.users WHERE email = $1', [cleanEmail]);
     if (existing.rows.length > 0 && existing.rows[0].is_verified) {
       res.status(409).json({ error: 'An account with this email already exists' });
@@ -148,19 +177,19 @@ driverRouter.post('/register', async (req: Request, res: Response): Promise<void
         `UPDATE public.users SET
           first_name = $1, last_name = $2, phone = $3, password_hash = $4,
           role = 'driver', license_number = $5, vehicle_type = $6, vehicle_plate = $7,
-          updated_at = NOW()
+          partner_id = $9, updated_at = NOW()
         WHERE email = $8 RETURNING id`,
-        [firstName, lastName || '', phone || '', passwordHash, licenseNumber || '', vehicleType || 'Tow Truck', vehiclePlate || '', cleanEmail]
+        [firstName, lastName || '', phone || '', passwordHash, licenseNumber || '', vehicleType || 'Tow Truck', vehiclePlate || '', cleanEmail, partner.rows[0].id]
       );
       driverId = updated.rows[0].id;
     } else {
       const result = await pool.query(
         `INSERT INTO public.users (
           first_name, last_name, email, phone, password_hash, role, is_verified,
-          license_number, vehicle_type, vehicle_plate, is_online
-        ) VALUES ($1, $2, $3, $4, $5, 'driver', FALSE, $6, $7, $8, TRUE)
+          license_number, vehicle_type, vehicle_plate, is_online, partner_id
+        ) VALUES ($1, $2, $3, $4, $5, 'driver', FALSE, $6, $7, $8, TRUE, $9)
         RETURNING id`,
-        [firstName, lastName || '', cleanEmail, phone || '', passwordHash, licenseNumber || '', vehicleType || 'Tow Truck', vehiclePlate || '']
+        [firstName, lastName || '', cleanEmail, phone || '', passwordHash, licenseNumber || '', vehicleType || 'Tow Truck', vehiclePlate || '', partner.rows[0].id]
       );
       driverId = result.rows[0].id;
     }
