@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import '../models/job_model.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/services/driver_location_access.dart';
+import '../../../core/services/navigation_service.dart';
 
 class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
   List<JobModel> _allJobs = [];
@@ -17,6 +18,17 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
   StreamSubscription<ServiceStatus>? _serviceStatusSub;
   bool _startingTracking = false;
   LocationAccess? _locationAccess;
+
+  // While turn-by-turn guidance runs, positions come from the Navigation SDK
+  // (road-snapped, with ETA) instead of the GPS stream above.
+  StreamSubscription<NavLocation>? _navLocationSub;
+  bool _navRestoreAttempted = false;
+  DateTime? _lastNavPostAt;
+  NavLocation? _lastNavPosted;
+  // Send a navigation position after this much movement, or this long apart so
+  // the client's ETA keeps updating while stuck in traffic
+  static const _navPostMinMoveM = 2.0;
+  static const _navPostMaxGap = Duration(seconds: 15);
 
   /// The driver's latest position while tracking an active job. A separate
   /// notifier so the map can follow it without rebuilding every listener of
@@ -40,11 +52,15 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Location service status unavailable: $e');
     }
+    _navLocationSub = NavigationService.instance.locations.listen(_onNavLocation);
+    NavigationService.instance.guiding.addListener(_onGuidingChanged);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    NavigationService.instance.guiding.removeListener(_onGuidingChanged);
+    _navLocationSub?.cancel();
     _serviceStatusSub?.cancel();
     _pollingTimer?.cancel();
     _stopLocationTracking();
@@ -98,8 +114,15 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
         // Share location for the whole job, including the drive to pickup
         if (hasActiveDelivery) {
           _startLocationTracking(activeJob!.id);
+          if (!_navRestoreAttempted) {
+            // Picks up guidance still running from before an app restart
+            _navRestoreAttempted = true;
+            NavigationService.instance.restoreIfPossible();
+          }
         } else {
           _stopLocationTracking();
+          // e.g. the job was cancelled while the driver was navigating
+          if (NavigationService.instance.guiding.value) NavigationService.instance.stop();
         }
       }
     } catch (e) {
@@ -169,6 +192,45 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
     return true;
   }
 
+  /// Guidance took over or handed back location updates.
+  void _onGuidingChanged() {
+    if (NavigationService.instance.guiding.value) {
+      _stopLocationTracking();
+      _lastNavPosted = null;
+      _lastNavPostAt = null;
+    } else {
+      final job = activeJob;
+      if (job != null) _startLocationTracking(job.id);
+    }
+  }
+
+  void _onNavLocation(NavLocation loc) {
+    // The SDK reports positions whenever the session is open; only guidance
+    // replaces the GPS stream, so ignore the rest to avoid double updates.
+    final job = activeJob;
+    if (job == null || !NavigationService.instance.guiding.value) return;
+
+    final last = _lastNavPosted;
+    final lastAt = _lastNavPostAt;
+    final moved = last == null
+        ? double.infinity
+        : Geolocator.distanceBetween(last.lat, last.lng, loc.lat, loc.lng);
+    final stale = lastAt == null || DateTime.now().difference(lastAt) >= _navPostMaxGap;
+    if (moved < _navPostMinMoveM && !stale) return;
+
+    _lastNavPosted = loc;
+    _lastNavPostAt = DateTime.now();
+    _postLocation(
+      job.id,
+      lat: loc.lat,
+      lng: loc.lng,
+      heading: loc.heading,
+      speed: loc.speed,
+      etaS: loc.etaS,
+      remainingM: loc.remainingM,
+    );
+  }
+
   /// Submit pickup condition form with optional images and audio, then mark as pickedUp.
   Future<void> submitPickupCondition({
     required String jobId,
@@ -229,6 +291,10 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
           pickupConditionAudio: audioDataUri,
         );
       }
+      // The pickup is done, so guidance to it is no longer needed
+      if (NavigationService.instance.leg == NavLeg.toPickup) {
+        await NavigationService.instance.stop();
+      }
     } catch (e) {
       debugPrint('API submitPickupCondition error: $e');
       rethrow;
@@ -266,10 +332,12 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
           updates['clientSignatureBase64'] = clientSignatureBase64;
         }
         _stopLocationTracking();
+        NavigationService.instance.stop();
         break;
       case JobStatus.cancelled:
         statusStr = 'cancelled';
         _stopLocationTracking();
+        NavigationService.instance.stop();
         break;
     }
 
@@ -338,6 +406,8 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _startLocationTracking(String jobId) async {
     // fetchJobs runs every few seconds; don't open a second stream mid-start
     if (_positionStream != null || _startingTracking) return;
+    // Guidance is already sending road-snapped positions
+    if (NavigationService.instance.guiding.value) return;
     _startingTracking = true;
 
     try {
@@ -357,7 +427,14 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
         (Position? position) {
           if (position != null) {
             driverPosition.value = position;
-            _updateDriverLocation(jobId, position);
+            _postLocation(
+              jobId,
+              lat: position.latitude,
+              lng: position.longitude,
+              // Heading is only meaningful while moving; phones report 0 or -1 when still
+              heading: position.speed > 0.5 && position.heading >= 0 ? position.heading : null,
+              speed: position.speed,
+            );
           }
         },
         onError: (Object e) => debugPrint('Location stream error: $e'),
@@ -368,19 +445,28 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _updateDriverLocation(String jobId, Position position) async {
+  Future<void> _postLocation(
+    String jobId, {
+    required double lat,
+    required double lng,
+    double? heading,
+    double? speed,
+    double? etaS,
+    double? remainingM,
+  }) async {
     try {
       await ApiClient.instance.post('/api/driver/location', {
         'jobId': jobId,
-        'lat': position.latitude,
-        'lng': position.longitude,
-        // Heading is only meaningful while moving; phones report 0 or -1 when still
-        if (position.speed > 0.5 && position.heading >= 0) 'heading': position.heading,
-        'speed': position.speed,
+        'lat': lat,
+        'lng': lng,
+        'heading': ?heading,
+        'speed': ?speed,
+        // From turn-by-turn navigation, so the client sees the real ETA
+        'eta_s': ?etaS,
+        'remaining_m': ?remainingM,
       });
-      debugPrint('Updated driver location: ${position.latitude}, ${position.longitude}');
     } catch (e) {
-      debugPrint('API _updateDriverLocation error: $e');
+      debugPrint('API _postLocation error: $e');
     }
   }
 

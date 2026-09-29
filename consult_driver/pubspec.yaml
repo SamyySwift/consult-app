@@ -20,9 +20,9 @@ dependencies:
   flutter_animate: ^4.5.0
   smooth_page_indicator: ^1.2.0
 
-  # Maps
-  flutter_map: ^7.0.2
-  latlong2: ^0.9.0
+  # Maps + turn-by-turn (Google Navigation SDK; includes the map views, so don't
+  # also add google_maps_flutter: the two bundle conflicting Maps SDKs)
+  google_navigation_flutter: ^0.11.1
 
   # Storage & Backend
   shared_preferences: ^2.3.3

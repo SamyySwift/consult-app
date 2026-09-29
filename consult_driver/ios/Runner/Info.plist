@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>GMSApiKey</key>
+	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -72,6 +74,8 @@
 	<string>This app needs access to location when in the background to broadcast your location to the client during active transit.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>This app shares your location with the client while you are delivering their vehicle, including when the app is in the background, so they can track the delivery.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Motion data helps turn-by-turn navigation keep track of your vehicle accurately.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

@@ -37,14 +37,6 @@ class AppConstants {
   static String get apiBaseUrl =>
       dotenv.env['API_BASE_URL'] ?? 'https://carpitalconsult.com';
 
-  /// TomTom API key for map tiles and address search. Null when not
-  /// configured, in which case maps use OpenStreetMap tiles and search uses
-  /// Photon.
-  static String? get tomtomApiKey {
-    final key = dotenv.isInitialized ? dotenv.env['TOMTOM_API_KEY'] : null;
-    return (key == null || key.isEmpty) ? null : key;
-  }
-
   // Storage Keys
   static const String keyUserData = 'driver_user_data';
   static const String keyAuthToken = 'driver_auth_token';
