@@ -33,7 +33,7 @@ export function broadcastDriverLocation(
   bookingId: string,
   lat: number,
   lng: number,
-  motion: { heading?: number; speed?: number } = {}
+  motion: { heading?: number; speed?: number; etaS?: number; remainingM?: number } = {}
 ) {
   const payload = JSON.stringify({
     type: 'driver_location',
@@ -44,6 +44,10 @@ export function broadcastDriverLocation(
     heading: motion.heading,
     // Metres per second
     speed: motion.speed,
+    // Time and road distance left to the current destination, from the
+    // driver's turn-by-turn navigation; absent when the driver isn't navigating
+    eta_s: motion.etaS,
+    remaining_m: motion.remainingM,
     at: new Date().toISOString(),
   });
 

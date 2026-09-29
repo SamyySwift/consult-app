@@ -646,6 +646,9 @@ driverRouter.post('/location', async (req: Request, res: Response): Promise<void
     v != null && Number.isFinite(Number(v)) ? Number(v) : undefined;
   const heading = finiteOrUndefined(req.body.heading);
   const speed = finiteOrUndefined(req.body.speed);
+  // From the driver's turn-by-turn navigation, when it's running
+  const etaS = finiteOrUndefined(req.body.eta_s);
+  const remainingM = finiteOrUndefined(req.body.remaining_m);
 
   if (lat == null || lng == null) {
     res.status(400).json({ error: 'Latitude and longitude are required' });
@@ -668,6 +671,8 @@ driverRouter.post('/location', async (req: Request, res: Response): Promise<void
       broadcastDriverLocation(jobId, Number(lat), Number(lng), {
         heading: heading != null && heading >= 0 && heading <= 360 ? heading : undefined,
         speed: speed != null && speed >= 0 ? speed : undefined,
+        etaS: etaS != null && etaS >= 0 ? etaS : undefined,
+        remainingM: remainingM != null && remainingM >= 0 ? remainingM : undefined,
       });
     }
 
