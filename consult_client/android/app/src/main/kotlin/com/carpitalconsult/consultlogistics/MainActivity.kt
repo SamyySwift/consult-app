@@ -1,4 +1,4 @@
-package com.example.consult_logistics
+package com.carpitalconsult.consultlogistics
 
 import io.flutter.embedding.android.FlutterActivity
 

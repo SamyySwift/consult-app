@@ -1,8 +1,7 @@
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-import '../constants/app_constants.dart';
+import 'dart:math';
+import '../network/api_client.dart';
 
+/// A place with known coordinates, ready to use as a pickup or delivery point.
 class PlaceResult {
   final String name;
   final String? details;
@@ -20,179 +19,90 @@ class PlaceResult {
   String get fullAddress => details == null ? name : '$name, $details';
 }
 
-/// Address search and reverse geocoding via TomTom Search when
-/// `TOMTOM_API_KEY` is set, otherwise via Photon (OpenStreetMap data, no key).
-/// Photon is built for search-as-you-type, unlike Nominatim whose policy forbids it.
+/// An address suggestion from search. It has no coordinates yet: pass it to
+/// [GeocodingService.resolve] once the user picks it.
+class PlaceSuggestion {
+  final String placeId;
+  final String name;
+  final String? details;
+
+  const PlaceSuggestion({required this.placeId, required this.name, this.details});
+}
+
+/// Address search and reverse geocoding through our backend, which calls
+/// Google Places (New) and the Geocoding API with a server-only key.
+///
+/// Google bills a search session (every suggestion request plus the one place
+/// the user picks) as a single lookup, so callers keep one [newSessionToken]
+/// per search and pass it to both [search] and [resolve].
 class GeocodingService {
   GeocodingService._();
   static final GeocodingService instance = GeocodingService._();
 
-  static const _photonUrl = 'https://photon.komoot.io';
-  // Photon rejects Dart's default "Dart/x.y (dart:io)" user agent with a 403;
-  // its usage policy asks apps to identify themselves.
-  static const _headers = {'User-Agent': 'CarpitalConsult/1.0 (com.carpitalconsult.app)'};
-  // minLon,minLat,maxLon,maxLat — keeps results inside Nigeria
-  static const _nigeriaBbox = '2.67,4.27,14.68,13.89';
-  static const _timeout = Duration(seconds: 8);
+  final _random = Random.secure();
 
-  Future<List<PlaceResult>> search(String query) async {
+  /// A random UUID v4, the format Google expects for session tokens.
+  String newSessionToken() {
+    final b = List<int>.generate(16, (_) => _random.nextInt(256));
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    final hex = b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-'
+        '${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
+
+  /// Suggestions for [query], or null when search is unavailable (network or
+  /// Google error), which callers show differently from "no matches".
+  Future<List<PlaceSuggestion>?> search(String query, {required String sessionToken}) async {
     final q = query.trim();
-    if (q.length < 3) return [];
+    if (q.length < 3) return const [];
 
-    final key = AppConstants.tomtomApiKey;
-    final results = key != null
-        ? await _fetch(
-            _tomtomUri(['search', '$q.json'], key, {
-              'typeahead': 'true',
-              'countrySet': 'NG',
-              'limit': '8',
-            }),
-            'results',
-            _parseTomTom,
-          )
-        : await _fetch(
-            Uri.parse('$_photonUrl/api/').replace(queryParameters: {
-              'q': q,
-              'limit': '8',
-              'lang': 'en',
-              'bbox': _nigeriaBbox,
-            }),
-            'features',
-            _parsePhoton,
-          );
-
-    // Road data often splits one road into several segments with the same name
-    final seen = <String>{};
-    return results.where((r) => seen.add(r.fullAddress)).take(5).toList();
-  }
-
-  Future<PlaceResult?> reverse(double lat, double lng) async {
-    final key = AppConstants.tomtomApiKey;
-    final results = key != null
-        ? await _fetch(
-            _tomtomUri(['reverseGeocode', '$lat,$lng.json'], key, {}),
-            'addresses',
-            _parseTomTom,
-          )
-        : await _fetch(
-            Uri.parse('$_photonUrl/reverse').replace(queryParameters: {
-              'lat': '$lat',
-              'lon': '$lng',
-              'lang': 'en',
-            }),
-            'features',
-            _parsePhoton,
-          );
-    return results.isEmpty ? null : results.first;
-  }
-
-  /// A TomTom Search API URL. Path segments are encoded individually, so a
-  /// `/` typed into a query stays part of the query.
-  Uri _tomtomUri(List<String> path, String key, Map<String, String> params) => Uri(
-        scheme: 'https',
-        host: 'api.tomtom.com',
-        pathSegments: ['search', '2', ...path],
-        queryParameters: {...params, 'language': 'en-GB', 'key': key},
-      );
-
-  /// Fetches [uri] and parses each entry of the response's [listKey] array.
-  Future<List<PlaceResult>> _fetch(
-    Uri uri,
-    String listKey,
-    PlaceResult? Function(dynamic) parse,
-  ) async {
-    try {
-      final res = await http.get(uri, headers: _headers).timeout(_timeout);
-      if (res.statusCode != 200) {
-        debugPrint('Geocoding failed: HTTP ${res.statusCode} from ${uri.host}');
-        return [];
-      }
-
-      final items = (jsonDecode(res.body)[listKey] as List?) ?? [];
-      return items.map(parse).whereType<PlaceResult>().toList();
-    } catch (e) {
-      debugPrint('Geocoding error: $e');
-      return [];
-    }
-  }
-
-  PlaceResult? _parsePhoton(dynamic feature) {
-    final coords = feature['geometry']?['coordinates'] as List?;
-    final props = feature['properties'] as Map<String, dynamic>?;
-    if (coords == null || coords.length < 2 || props == null) return null;
-
-    String? str(String key) => _clean(props[key]);
-
-    final street = [str('housenumber'), str('street')].whereType<String>().join(' ');
-    final name = str('name') ?? (street.isNotEmpty ? street : null);
-    if (name == null) return null;
-
-    return _place(
-      name,
-      [
-        if (str('name') != null && street.isNotEmpty) street,
-        str('district'),
-        str('city'),
-        str('state'),
-      ],
-      (coords[1] as num).toDouble(),
-      (coords[0] as num).toDouble(),
+    final res = await ApiClient.instance.get(
+      '/api/maps/autocomplete?q=${Uri.encodeQueryComponent(q)}'
+      '&session=${Uri.encodeQueryComponent(sessionToken)}',
     );
+    if (!res.isSuccess || res.data is! List) return null;
+
+    return [
+      for (final s in res.data as List)
+        if (s is Map && s['placeId'] is String && s['name'] is String)
+          PlaceSuggestion(
+            placeId: s['placeId'] as String,
+            name: s['name'] as String,
+            details: s['details'] as String?,
+          ),
+    ];
   }
 
-  PlaceResult? _parseTomTom(dynamic result) {
-    final address = result['address'] as Map<String, dynamic>?;
-    final position = result['position'];
-    if (address == null || position == null) return null;
-
-    // Search returns {lat, lon}; reverse geocoding returns a "lat,lon" string
-    final double lat;
-    final double lng;
-    if (position is Map) {
-      lat = (position['lat'] as num).toDouble();
-      lng = (position['lon'] as num).toDouble();
-    } else {
-      final parts = '$position'.split(',');
-      if (parts.length != 2) return null;
-      lat = double.parse(parts[0]);
-      lng = double.parse(parts[1]);
-    }
-
-    String? str(String key) => _clean(address[key]);
-
-    final poi = _clean(result['poi']?['name']);
-    final street = [str('streetNumber'), str('streetName')].whereType<String>().join(' ');
-    final name = poi ?? (street.isNotEmpty ? street : null) ?? str('freeformAddress');
-    if (name == null) return null;
-
-    return _place(
-      name,
-      [
-        if (poi != null && street.isNotEmpty) street,
-        str('municipalitySubdivision'),
-        str('municipality'),
-        str('countrySubdivision'),
-      ],
-      lat,
-      lng,
+  /// Coordinates for a picked suggestion, or null if it couldn't be loaded.
+  Future<PlaceResult?> resolve(PlaceSuggestion suggestion, {required String sessionToken}) async {
+    final res = await ApiClient.instance.get(
+      '/api/maps/place/${Uri.encodeComponent(suggestion.placeId)}'
+      '?session=${Uri.encodeQueryComponent(sessionToken)}',
     );
-  }
+    final data = res.data;
+    if (!res.isSuccess || data is! Map || data['lat'] is! num || data['lng'] is! num) return null;
 
-  static String? _clean(dynamic v) => v is String && v.trim().isNotEmpty ? v.trim() : null;
-
-  static PlaceResult _place(String name, List<String?> parts, double lat, double lng) {
-    // Skip parts that repeat the name (e.g. a city result whose city is itself)
-    final detailParts = <String>[];
-    for (final part in parts) {
-      if (part != null && part != name && !detailParts.contains(part)) {
-        detailParts.add(part);
-      }
-    }
     return PlaceResult(
-      name: name,
-      details: detailParts.isEmpty ? null : detailParts.join(', '),
-      lat: lat,
-      lng: lng,
+      name: suggestion.name,
+      details: suggestion.details,
+      lat: (data['lat'] as num).toDouble(),
+      lng: (data['lng'] as num).toDouble(),
+    );
+  }
+
+  /// The address at a map point, or null if there isn't one or lookup failed.
+  Future<PlaceResult?> reverse(double lat, double lng) async {
+    final res = await ApiClient.instance.get('/api/maps/reverse?lat=$lat&lng=$lng');
+    final data = res.data;
+    if (!res.isSuccess || data is! Map || data['name'] is! String) return null;
+
+    return PlaceResult(
+      name: data['name'] as String,
+      details: data['details'] as String?,
+      // The pin's exact position; the backend echoes it back
+      lat: (data['lat'] as num?)?.toDouble() ?? lat,
+      lng: (data['lng'] as num?)?.toDouble() ?? lng,
     );
   }
 }

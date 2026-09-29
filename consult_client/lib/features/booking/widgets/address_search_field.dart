@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' show LatLng;
 import '../../../core/services/geocoding_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/custom_text_field.dart';
@@ -36,10 +36,16 @@ class AddressSearchField extends StatefulWidget {
 class _AddressSearchFieldState extends State<AddressSearchField> {
   final _focusNode = FocusNode();
   Timer? _debounce;
-  List<PlaceResult> _results = [];
+  List<PlaceSuggestion> _results = [];
   bool _searching = false;
   bool _searched = false;
+  // Search couldn't reach Google, as opposed to finding nothing
+  bool _searchFailed = false;
   int _requestId = 0;
+  // One token per search, shared with the pick that ends it (billed as one lookup)
+  String? _sessionToken;
+  // Suggestion whose coordinates are being fetched after a tap
+  String? _resolvingId;
 
   @override
   void initState() {
@@ -74,14 +80,38 @@ class _AddressSearchFieldState extends State<AddressSearchField> {
 
   Future<void> _search(String text) async {
     final id = ++_requestId;
-    final results = await GeocodingService.instance.search(text);
+    final geocoding = GeocodingService.instance;
+    final token = _sessionToken ??= geocoding.newSessionToken();
+    final results = await geocoding.search(text, sessionToken: token);
     // Results for an older query can arrive after a newer one
     if (!mounted || id != _requestId) return;
     setState(() {
-      _results = results;
+      _results = results ?? [];
+      _searchFailed = results == null;
       _searching = false;
       _searched = true;
     });
+  }
+
+  Future<void> _choose(PlaceSuggestion suggestion) async {
+    if (_resolvingId != null) return;
+    setState(() => _resolvingId = suggestion.placeId);
+
+    final geocoding = GeocodingService.instance;
+    final place = await geocoding.resolve(
+      suggestion,
+      sessionToken: _sessionToken ?? geocoding.newSessionToken(),
+    );
+    if (!mounted) return;
+    setState(() => _resolvingId = null);
+
+    if (place == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't load that place. Try again or pick it on the map.")),
+      );
+      return;
+    }
+    _select(place);
   }
 
   void _select(PlaceResult place) {
@@ -89,10 +119,13 @@ class _AddressSearchFieldState extends State<AddressSearchField> {
     widget.onSelected(place);
     _debounce?.cancel();
     _requestId++;
+    // The pick ends this search session; the next search starts a new one
+    _sessionToken = null;
     setState(() {
       _results = [];
       _searching = false;
       _searched = false;
+      _searchFailed = false;
     });
     _focusNode.unfocus();
   }
@@ -148,7 +181,9 @@ class _AddressSearchFieldState extends State<AddressSearchField> {
                     ? Padding(
                         padding: const EdgeInsets.all(14),
                         child: Text(
-                          'No matching places. Try another spelling or pick it on the map.',
+                          _searchFailed
+                              ? "Address search isn't available right now. Pick the spot on the map instead."
+                              : 'No matching places. Try another spelling or pick it on the map.',
                           style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
                         ),
                       )
@@ -156,13 +191,18 @@ class _AddressSearchFieldState extends State<AddressSearchField> {
                         children: [
                           for (final place in _results)
                             InkWell(
-                              onTap: () => _select(place),
+                              onTap: () => _choose(place),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(Icons.place_outlined, size: 18, color: context.colors.accent),
+                                    _resolvingId == place.placeId
+                                        ? const SizedBox.square(
+                                            dimension: 18,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          )
+                                        : Icon(Icons.place_outlined, size: 18, color: context.colors.accent),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(

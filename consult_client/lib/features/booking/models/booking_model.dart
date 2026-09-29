@@ -81,6 +81,10 @@ class BookingModel {
   final DateTime? driverLocationAt;
   /// Direction of travel in degrees clockwise from north, when moving.
   final double? driverHeading;
+  /// Time and road distance left to the driver's current destination, from
+  /// their turn-by-turn navigation. Null when they aren't navigating.
+  final double? driverEtaS;
+  final double? driverRemainingM;
 
   const BookingModel({
     required this.id,
@@ -105,9 +109,18 @@ class BookingModel {
     this.driverLng,
     this.driverLocationAt,
     this.driverHeading,
+    this.driverEtaS,
+    this.driverRemainingM,
   });
 
-  BookingModel copyWithDriverLocation(double lat, double lng, DateTime at, {double? heading}) => BookingModel(
+  BookingModel copyWithDriverLocation(
+    double lat,
+    double lng,
+    DateTime at, {
+    double? heading,
+    double? etaS,
+    double? remainingM,
+  }) => BookingModel(
         id: id,
         userId: userId,
         vehicle: vehicle,
@@ -130,6 +143,8 @@ class BookingModel {
         driverLng: lng,
         driverLocationAt: at,
         driverHeading: heading,
+        driverEtaS: etaS,
+        driverRemainingM: remainingM,
       );
 
   String get serviceName {

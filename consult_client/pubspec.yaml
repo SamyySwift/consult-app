@@ -29,9 +29,8 @@ dependencies:
   dotted_border: ^2.1.0
   pinput: ^3.0.1
 
-  # Maps (OpenStreetMap — no API key needed)
-  flutter_map: ^7.0.2
-  latlong2: ^0.9.1
+  # Maps (Google Maps — key in android/local.properties and ios/Flutter/Secrets.xcconfig)
+  google_maps_flutter: ^2.18.1
 
   # Media & Files
   image_picker: ^1.1.2

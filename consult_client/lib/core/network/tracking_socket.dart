@@ -11,6 +11,8 @@ class DriverLocationUpdate {
   final double lng;
   final DateTime at;
   final double? heading;
+  final double? etaS;
+  final double? remainingM;
 
   const DriverLocationUpdate({
     required this.bookingId,
@@ -18,6 +20,8 @@ class DriverLocationUpdate {
     required this.lng,
     required this.at,
     this.heading,
+    this.etaS,
+    this.remainingM,
   });
 }
 
@@ -124,6 +128,8 @@ class TrackingSocket {
               lng: lng,
               at: DateTime.tryParse(msg['at'] as String? ?? '') ?? DateTime.now(),
               heading: (msg['heading'] as num?)?.toDouble(),
+              etaS: (msg['eta_s'] as num?)?.toDouble(),
+              remainingM: (msg['remaining_m'] as num?)?.toDouble(),
             ),
           );
         }

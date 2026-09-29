@@ -68,7 +68,14 @@ class BookingProvider extends ChangeNotifier {
     if (index == -1) return;
 
     _bookings[index] =
-        _bookings[index].copyWithDriverLocation(update.lat, update.lng, update.at, heading: update.heading);
+        _bookings[index].copyWithDriverLocation(
+          update.lat,
+          update.lng,
+          update.at,
+          heading: update.heading,
+          etaS: update.etaS,
+          remainingM: update.remainingM,
+        );
     notifyListeners();
   }
 

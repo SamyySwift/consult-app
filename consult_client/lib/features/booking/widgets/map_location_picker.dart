@@ -1,11 +1,8 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../core/services/geocoding_service.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/base_map.dart';
 import '../../../core/widgets/custom_button.dart';
 
 /// Full-screen map where the user drags the map under a fixed centre pin.
@@ -32,8 +29,7 @@ class MapLocationPicker extends StatefulWidget {
 class _MapLocationPickerState extends State<MapLocationPicker> {
   static const _lagos = LatLng(6.5244, 3.3792);
 
-  final _mapController = MapController();
-  Timer? _debounce;
+  GoogleMapController? _mapController;
   late LatLng _center;
   PlaceResult? _place;
   bool _resolving = false;
@@ -47,17 +43,9 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
     _resolveAddress();
   }
 
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    super.dispose();
-  }
-
-  void _onMapMoved(MapCamera camera, bool hasGesture) {
-    _center = camera.center;
-    setState(() => _resolving = true);
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 600), _resolveAddress);
+  void _onCameraMove(CameraPosition position) {
+    _center = position.target;
+    if (!_resolving) setState(() => _resolving = true);
   }
 
   Future<void> _resolveAddress() async {
@@ -104,9 +92,8 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
       if (!mounted) return;
 
       final here = LatLng(pos.latitude, pos.longitude);
-      _mapController.move(here, 17);
-      _center = here;
-      _resolveAddress();
+      // The camera settling fires onCameraIdle, which looks up the address
+      await _mapController?.animateCamera(CameraUpdate.newLatLngZoom(here, 17));
     } catch (e) {
       _showMessage('Could not get your location. Please try again.');
     } finally {
@@ -130,14 +117,22 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
       ),
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _center,
-              initialZoom: widget.initial != null ? 16 : 11,
-              onPositionChanged: _onMapMoved,
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _center,
+              zoom: widget.initial != null ? 16 : 11,
             ),
-            children: [baseMapTiles(dark: false)],
+            onMapCreated: (controller) => _mapController = controller,
+            onCameraMove: _onCameraMove,
+            // Look the address up once the map settles, not on every frame of a drag
+            onCameraIdle: _resolveAddress,
+            // Keep the Google logo above the address sheet
+            padding: const EdgeInsets.only(bottom: 190),
+            rotateGesturesEnabled: false,
+            tiltGesturesEnabled: false,
+            zoomControlsEnabled: false,
+            myLocationButtonEnabled: false,
+            mapToolbarEnabled: false,
           ),
 
           // Fixed centre pin; its tip marks the chosen point
@@ -148,12 +143,6 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
                 child: Icon(Icons.location_on, size: 48, color: context.colors.error),
               ),
             ),
-          ),
-
-          Positioned(
-            left: 12,
-            bottom: 200,
-            child: _Attribution(),
           ),
 
           Positioned(
@@ -222,23 +211,6 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Tile provider credit, legible over the light map.
-class _Attribution extends StatelessWidget {
-  const _Attribution();
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      mapAttribution,
-      style: TextStyle(
-        fontSize: 11,
-        color: Colors.black.withValues(alpha: 0.6),
-        shadows: const [Shadow(color: Colors.white, blurRadius: 4)],
       ),
     );
   }
