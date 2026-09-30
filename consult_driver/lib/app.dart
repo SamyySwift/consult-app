@@ -47,7 +47,7 @@ final _router = GoRouter(
     ),
     GoRoute(
       path: AppRoutes.activeJob,
-      builder: (context, state) => const ActiveJobScreen(),
+      builder: (context, state) => ActiveJobScreen(jobId: state.uri.queryParameters['job']),
     ),
     // Each tab is its own branch so it keeps its scroll position and
     // navigation stack while another tab is showing.

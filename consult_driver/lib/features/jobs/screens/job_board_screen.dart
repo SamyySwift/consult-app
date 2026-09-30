@@ -351,7 +351,7 @@ class _CardAction extends StatelessWidget {
                           backgroundColor: Color(0xFF161616),
                         ),
                       );
-                      context.push(AppRoutes.activeJob);
+                      context.push(AppRoutes.activeJobFor(job.id));
                     }
                   },
           ),
@@ -361,7 +361,7 @@ class _CardAction extends StatelessWidget {
         return GlassPillButton(
           icon: Icons.navigation_rounded,
           label: 'Mission Progress',
-          onTap: () => context.push(AppRoutes.activeJob),
+          onTap: () => context.push(AppRoutes.activeJobFor(job.id)),
         );
 
       case _JobCardVariant.completed:

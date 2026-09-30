@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:google_navigation_flutter/google_navigation_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Which part of a job the driver is navigating.
 enum NavLeg { toPickup, toDropoff }
@@ -26,6 +27,14 @@ class NavLocation {
     this.etaS,
     this.remainingM,
   });
+}
+
+/// The driver reached the stop they were navigating to.
+class NavArrival {
+  final String jobId;
+  final NavLeg leg;
+
+  const NavArrival({required this.jobId, required this.leg});
 }
 
 /// Time and road distance left to the current destination.
@@ -67,6 +76,13 @@ class NavigationService {
   /// Time and distance left while guiding.
   final ValueNotifier<NavProgress?> progress = ValueNotifier(null);
 
+  // Which job's stop guidance leads to. A driver can have several active
+  // jobs, so the job screen needs to know which one this is. Saved so an app
+  // restart mid-delivery restores guidance onto the right job.
+  static const _prefsJobId = 'nav_job_id';
+  static const _prefsLeg = 'nav_leg';
+  String? _jobId;
+  String? get jobId => _jobId;
   NavLeg? _leg;
   NavLeg? get leg => _leg;
 
@@ -74,9 +90,9 @@ class NavigationService {
   /// Road-snapped positions while the session is active.
   Stream<NavLocation> get locations => _locations.stream;
 
-  final _arrivals = StreamController<NavLeg>.broadcast();
+  final _arrivals = StreamController<NavArrival>.broadcast();
   /// Emits the leg the driver just arrived at the end of.
-  Stream<NavLeg> get arrivals => _arrivals.stream;
+  Stream<NavArrival> get arrivals => _arrivals.stream;
 
   bool _listenersAttached = false;
   StreamSubscription<RemainingTimeOrDistanceChangedEvent>? _progressSub;
@@ -92,7 +108,14 @@ class NavigationService {
     try {
       if (!await GoogleMapsNavigator.areTermsAccepted()) return;
       await _ensureSession();
-      guiding.value = await GoogleMapsNavigator.isGuidanceRunning();
+      final running = await GoogleMapsNavigator.isGuidanceRunning();
+      if (running) {
+        final prefs = await SharedPreferences.getInstance();
+        _jobId = prefs.getString(_prefsJobId);
+        final leg = prefs.getString(_prefsLeg);
+        _leg = NavLeg.values.where((l) => l.name == leg).firstOrNull;
+      }
+      guiding.value = running;
     } catch (e) {
       debugPrint('Navigation restore failed: $e');
     }
@@ -100,6 +123,7 @@ class NavigationService {
 
   /// Shows Google's terms if needed, then starts guidance to the destination.
   Future<NavStartResult> start({
+    required String jobId,
     required NavLeg leg,
     required double lat,
     required double lng,
@@ -160,7 +184,9 @@ class NavigationService {
       }
 
       await GoogleMapsNavigator.startGuidance();
+      _jobId = jobId;
       _leg = leg;
+      unawaited(_saveTarget());
       guiding.value = true;
       // The listener only reports changes, so show the starting figures now
       try {
@@ -195,8 +221,10 @@ class NavigationService {
 
   /// Stops guidance and clears the route. The session stays for next time.
   Future<void> stop() async {
+    _jobId = null;
     _leg = null;
     progress.value = null;
+    unawaited(_saveTarget());
     if (!guiding.value && !sessionReady.value) return;
     guiding.value = false;
     try {
@@ -210,6 +238,13 @@ class NavigationService {
   /// Feeds a position as if it came from the SDK, for unit tests.
   @visibleForTesting
   void debugEmitLocation(NavLocation location) => _locations.add(location);
+
+  /// Sets which job guidance leads to, as [start] would, for unit tests.
+  @visibleForTesting
+  void debugSetTarget(String jobId, NavLeg leg) {
+    _jobId = jobId;
+    _leg = leg;
+  }
 
   /// Drives the current route with simulated GPS, for testing on
   /// emulators and simulators. Debug builds only.
@@ -248,10 +283,30 @@ class NavigationService {
 
     await GoogleMapsNavigator.setRoadSnappedLocationUpdatedListener(_onLocation);
     GoogleMapsNavigator.setOnArrivalListener((_) async {
+      final arrivedJob = _jobId;
       final arrivedLeg = _leg;
       await stop();
-      if (arrivedLeg != null) _arrivals.add(arrivedLeg);
+      if (arrivedJob != null && arrivedLeg != null) {
+        _arrivals.add(NavArrival(jobId: arrivedJob, leg: arrivedLeg));
+      }
     });
+  }
+
+  Future<void> _saveTarget() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jobId = _jobId;
+      final leg = _leg;
+      if (jobId == null || leg == null) {
+        await prefs.remove(_prefsJobId);
+        await prefs.remove(_prefsLeg);
+      } else {
+        await prefs.setString(_prefsJobId, jobId);
+        await prefs.setString(_prefsLeg, leg.name);
+      }
+    } catch (e) {
+      debugPrint('Saving navigation target failed: $e');
+    }
   }
 
   /// Route calculation fails until the SDK has a location, so wait for one.

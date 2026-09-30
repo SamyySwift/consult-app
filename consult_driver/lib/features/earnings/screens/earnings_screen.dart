@@ -269,7 +269,7 @@ class _ActiveVehicleContent extends StatelessWidget {
                 size: 18,
                 color: Colors.white,
               ),
-              onPressed: () => context.push(AppRoutes.activeJob),
+              onPressed: () => context.push(AppRoutes.activeJobFor(job.id)),
             ),
         ],
       ),

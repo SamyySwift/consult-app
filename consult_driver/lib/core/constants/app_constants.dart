@@ -13,6 +13,8 @@ class AppRoutes {
   static const String dashboard = '/dashboard';
   static const String jobBoard = '/jobs';
   static const String activeJob = '/jobs/active';
+  /// The active-job screen for one job; drivers can have several at once.
+  static String activeJobFor(String jobId) => '$activeJob?job=${Uri.encodeQueryComponent(jobId)}';
   static const String earnings = '/earnings';
   static const String profile = '/profile';
 }

@@ -25,6 +25,7 @@ class DashboardScreen extends StatelessWidget {
     final jobProv = context.watch<JobProvider>();
     final driver = auth.driver;
     final activeJob = jobProv.activeJob;
+    final activeJobs = jobProv.activeJobs;
     final pendingJob = jobProv.assignedJobs.isNotEmpty ? jobProv.assignedJobs.first : null;
 
     if (driver == null && auth.isLoading) {
@@ -192,12 +193,19 @@ class DashboardScreen extends StatelessWidget {
                       children: [
                         if (activeJob != null) ...[
                           _SectionHeader(
-                            title: 'Current Mission',
+                            title: activeJobs.length > 1
+                                ? 'Current Missions (${activeJobs.length})'
+                                : 'Current Mission',
                             actionLabel: 'Open Navigation',
-                            onAction: () => context.push(AppRoutes.activeJob),
+                            // The most urgent job: handovers first, then pickups
+                            onAction: () => context.push(AppRoutes.activeJobFor(activeJob.id)),
                           ),
                           const SizedBox(height: 14),
-                          _ActiveJobCard(job: activeJob),
+                          // Every job the driver is carrying, each opening its own screen
+                          for (final (i, job) in activeJobs.indexed) ...[
+                            if (i > 0) const SizedBox(height: 14),
+                            _ActiveJobCard(job: job),
+                          ],
                         ] else if (pendingJob != null) ...[
                           const _SectionHeader(title: 'New Assigned Job'),
                           const SizedBox(height: 14),
@@ -442,7 +450,7 @@ class _ActiveJobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.push(AppRoutes.activeJob),
+      onTap: () => context.push(AppRoutes.activeJobFor(job.id)),
       child: GlassContainer(
         radius: 30,
         blur: true,
@@ -489,7 +497,7 @@ class _ActiveJobCard extends StatelessWidget {
             GlassPillButton(
               icon: Icons.navigation_rounded,
               label: 'Manage Mission',
-              onTap: () => context.push(AppRoutes.activeJob),
+              onTap: () => context.push(AppRoutes.activeJobFor(job.id)),
             ),
           ],
         ),
@@ -571,7 +579,7 @@ class _PendingJobCard extends StatelessWidget {
                             backgroundColor: Color(0xFF161616),
                           ),
                         );
-                        context.push(AppRoutes.activeJob);
+                        context.push(AppRoutes.activeJobFor(job.id));
                       }
                     },
             ),

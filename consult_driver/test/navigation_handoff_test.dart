@@ -50,7 +50,11 @@ void main() {
     final posts = <Map<String, dynamic>>[];
     final client = MockClient((req) async {
       if (req.url.path == '/api/driver/jobs') {
-        return http.Response(jsonEncode([{'id': 'J1', 'status': 'confirmed'}]), 200);
+        // Two vehicles at once: one to pick up, one already on the way
+        return http.Response(jsonEncode([
+          {'id': 'J1', 'status': 'confirmed'},
+          {'id': 'J2', 'status': 'inTransit'},
+        ]), 200);
       }
       if (req.url.path == '/api/driver/location') {
         posts.add(jsonDecode(req.body) as Map<String, dynamic>);
@@ -66,13 +70,15 @@ void main() {
       await flush();
       expect(fake.active, 1, reason: 'GPS stream runs for the active job');
 
-      // GPS positions are posted without navigation fields
+      // GPS positions go to every active job, without navigation fields
       fake.positions.add(pos(6.45, 3.47));
       await flush();
-      expect(posts.last['jobId'], 'J1');
+      expect(posts.last['jobIds'], ['J2', 'J1'], reason: 'all active jobs, most urgent first');
       expect(posts.last.containsKey('eta_s'), isFalse);
+      expect(posts.last.containsKey('navJobId'), isFalse);
 
       // Guidance starts: GPS stream stops, positions come from navigation
+      nav.debugSetTarget('J2', NavLeg.toDropoff);
       nav.guiding.value = true;
       await flush();
       expect(fake.active, 0, reason: 'GPS stream paused while guiding');
@@ -80,6 +86,8 @@ void main() {
       nav.debugEmitLocation(const NavLocation(lat: 6.4500, lng: 3.4700, heading: 45, etaS: 1200, remainingM: 9000));
       await flush();
       expect(posts.length, before + 1);
+      expect(posts.last['jobIds'], ['J2', 'J1']);
+      expect(posts.last['navJobId'], 'J2', reason: 'the ETA is only for the navigated job');
       expect(posts.last['eta_s'], 1200);
       expect(posts.last['remaining_m'], 9000);
       expect(posts.last['heading'], 45);

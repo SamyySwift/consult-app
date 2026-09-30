@@ -24,7 +24,12 @@ import 'delivery_acknowledgement_sheet.dart';
 import 'pickup_condition_form.dart';
 
 class ActiveJobScreen extends StatefulWidget {
-  const ActiveJobScreen({super.key});
+  /// The job to show. Drivers can have several active jobs (one to pick up,
+  /// another to hand over), so entry points pass the one that was tapped;
+  /// without it the most urgent job shows.
+  final String? jobId;
+
+  const ActiveJobScreen({super.key, this.jobId});
 
   @override
   State<ActiveJobScreen> createState() => _ActiveJobScreenState();
@@ -32,13 +37,21 @@ class ActiveJobScreen extends StatefulWidget {
 
 class _ActiveJobScreenState extends State<ActiveJobScreen> {
   final _nav = NavigationService.instance;
-  StreamSubscription<NavLeg>? _arrivalSub;
+  StreamSubscription<NavArrival>? _arrivalSub;
   bool _startingNav = false;
+  String? _selectedId;
 
   @override
   void initState() {
     super.initState();
+    _selectedId = widget.jobId;
     _arrivalSub = _nav.arrivals.listen(_onArrival);
+  }
+
+  @override
+  void didUpdateWidget(covariant ActiveJobScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.jobId != null && widget.jobId != oldWidget.jobId) _selectedId = widget.jobId;
   }
 
   @override
@@ -55,19 +68,30 @@ class _ActiveJobScreenState extends State<ActiveJobScreen> {
     }
   }
 
-  void _onArrival(NavLeg leg) {
+  void _onArrival(NavArrival arrival) {
     if (!mounted) return;
+    final vehicle = context.read<JobProvider>().jobById(arrival.jobId)?.vehicle.displayName;
+    // Show the job that just arrived, so its next step is on screen
+    setState(() => _selectedId = arrival.jobId);
+    final where = arrival.leg == NavLeg.toPickup ? 'the pickup point' : 'the delivery address';
+    final next = arrival.leg == NavLeg.toPickup ? 'Confirm the vehicle pickup below.' : 'Complete the handover below.';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: const Color(0xFF161616),
         content: Text(
-          leg == NavLeg.toPickup
-              ? "You've arrived at the pickup point. Confirm the vehicle pickup below."
-              : "You've arrived at the delivery address. Complete the handover below.",
+          vehicle == null ? "You've arrived at $where. $next" : "You've arrived at $where for the $vehicle. $next",
         ),
       ),
     );
   }
+
+  /// Short "what's next" label for a job, used by the job switcher.
+  String _nextStepLabel(JobModel job) => switch (job.status) {
+    JobStatus.confirmed => 'Pick up',
+    JobStatus.pickedUp => 'Start trip',
+    JobStatus.inTransit => 'Hand over',
+    _ => 'Job',
+  };
 
   /// The leg the driver would navigate next for [job], if any.
   NavLeg? _legFor(JobModel job) => switch (job.status) {
@@ -85,8 +109,11 @@ class _ActiveJobScreenState extends State<ActiveJobScreen> {
     if (!ok || !mounted) return;
 
     setState(() => _startingNav = true);
+    // Guidance leads to one stop at a time; switching jobs replaces it
+    if (_nav.guiding.value && _nav.jobId != job.id) await _nav.stop();
     final target = leg == NavLeg.toPickup ? job.pickup : job.dropoff;
     final result = await _nav.start(
+      jobId: job.id,
       leg: leg,
       lat: target.lat,
       lng: target.lng,
@@ -126,7 +153,19 @@ class _ActiveJobScreenState extends State<ActiveJobScreen> {
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<JobProvider>();
-    final job = prov.activeJob;
+    final activeJobs = prov.activeJobs;
+    final requested = _selectedId == null ? null : prov.jobById(_selectedId!);
+
+    if (requested != null && !requested.isActive) {
+      return _NoActiveJob(
+        title: 'This job is no longer active.',
+        subtitle: requested.status == JobStatus.completed
+            ? 'It has been delivered and handed over.'
+            : 'It was cancelled or changed by dispatch.',
+        onBack: _goBack,
+      );
+    }
+    final job = requested ?? prov.activeJob;
 
     if (job == null) {
       return Scaffold(
@@ -160,10 +199,25 @@ class _ActiveJobScreenState extends State<ActiveJobScreen> {
       );
     }
 
+    final switcher = activeJobs.length > 1
+        ? _JobSwitcher(
+            jobs: activeJobs,
+            selectedId: job.id,
+            labelFor: _nextStepLabel,
+            onSelect: (j) => setState(() => _selectedId = j.id),
+          )
+        : null;
+
     return ValueListenableBuilder<bool>(
       valueListenable: _nav.guiding,
-      builder: (context, guiding, _) {
+      builder: (context, guidanceRunning, _) {
         final leg = _legFor(job);
+        // Guidance belongs to one job's stop. After an app restart the target
+        // may be unknown; then it's shown on whichever job is open.
+        final guiding = guidanceRunning && (_nav.jobId == null || _nav.jobId == job.id);
+        final navigatingOther = guidanceRunning && !guiding
+            ? prov.jobById(_nav.jobId!)
+            : null;
         return Scaffold(
           backgroundColor: Colors.black,
           body: Stack(
@@ -193,6 +247,8 @@ class _ActiveJobScreenState extends State<ActiveJobScreen> {
                           onTap: _goBack,
                         ),
                       ),
+                    if (!guiding && switcher != null)
+                      Padding(padding: const EdgeInsets.only(top: 10), child: switcher),
                   ],
                 ),
               ),
@@ -205,13 +261,25 @@ class _ActiveJobScreenState extends State<ActiveJobScreen> {
                     ? _GuidancePanel(
                         action: _buildStatusAction(context, prov, job),
                         onBack: _goBack,
+                        switcher: switcher,
                       )
                     : _JobSheet(
                         job: job,
+                        navigatingOther: navigatingOther == null
+                            ? null
+                            : _NavigatingElsewhere(
+                                job: navigatingOther,
+                                leg: _nav.leg,
+                                onOpen: () => setState(() => _selectedId = navigatingOther.id),
+                              ),
                         navAction: leg == null
                             ? null
                             : DriverButton(
-                                label: leg == NavLeg.toPickup ? 'Navigate to Pickup' : 'Navigate to Drop-off',
+                                label: navigatingOther != null
+                                    ? 'Navigate here instead'
+                                    : leg == NavLeg.toPickup
+                                        ? 'Navigate to Pickup'
+                                        : 'Navigate to Drop-off',
                                 isOutlined: true,
                                 isLoading: _startingNav,
                                 icon: const Icon(Icons.navigation_rounded, size: 18, color: DriverColors.accent),
@@ -259,8 +327,8 @@ class _ActiveJobScreenState extends State<ActiveJobScreen> {
             );
             if (!ok) return;
             await prov.updateJobStatus(job.id, JobStatus.inTransit);
-            // Straight into turn-by-turn to the drop-off
-            final updated = prov.activeJob;
+            // Straight into turn-by-turn to this job's drop-off
+            final updated = prov.jobById(job.id);
             if (updated != null && mounted) await _startNavigation(updated, NavLeg.toDropoff);
           },
         );
@@ -447,6 +515,9 @@ class _JobMapState extends State<_JobMap> {
       if (markers.isNotEmpty) await controller.addMarkers(markers);
 
       if (controller is GoogleNavigationViewController) {
+        // Turn-by-turn UI only for the job being navigated: guidance may be
+        // running for another job while this one is on screen
+        await controller.setNavigationUIEnabled(guiding);
         // Google's own trip footer would sit under our guidance panel, which
         // shows the same time and distance
         await controller.setNavigationFooterEnabled(!guiding);
@@ -569,8 +640,10 @@ class _JobMapState extends State<_JobMap> {
 class _GuidancePanel extends StatelessWidget {
   final Widget action;
   final VoidCallback onBack;
+  /// Chips for the driver's other active jobs, when there are several.
+  final Widget? switcher;
 
-  const _GuidancePanel({required this.action, required this.onBack});
+  const _GuidancePanel({required this.action, required this.onBack, this.switcher});
 
   String _formatDuration(double seconds) {
     final minutes = (seconds / 60).round();
@@ -650,12 +723,147 @@ class _GuidancePanel extends StatelessWidget {
                       child: const Text('Simulate drive (debug)', style: TextStyle(fontSize: 12)),
                     ),
                   ),
+                if (switcher != null) ...[
+                  const SizedBox(height: 4),
+                  switcher!,
+                ],
                 const SizedBox(height: 10),
                 action,
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Several active jobs ────────────────────────────────────────────────────
+
+/// Chips to switch between the driver's active jobs, e.g. "Pick up · 2022 Camry".
+class _JobSwitcher extends StatelessWidget {
+  final List<JobModel> jobs;
+  final String selectedId;
+  final String Function(JobModel) labelFor;
+  final ValueChanged<JobModel> onSelect;
+
+  const _JobSwitcher({
+    required this.jobs,
+    required this.selectedId,
+    required this.labelFor,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: jobs.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final job = jobs[i];
+          final selected = job.id == selectedId;
+          return Semantics(
+            button: true,
+            selected: selected,
+            child: GestureDetector(
+              onTap: () => onSelect(job),
+              child: GlassPill(
+                blur: true,
+                glow: selected,
+                tint: selected ? DriverColors.accent : null,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                child: Text(
+                  '${labelFor(job)} · ${job.vehicle.displayName}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? Colors.white : Colors.white.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Shown on a job's sheet while guidance leads to another job's stop.
+class _NavigatingElsewhere extends StatelessWidget {
+  final JobModel job;
+  final NavLeg? leg;
+  final VoidCallback onOpen;
+
+  const _NavigatingElsewhere({required this.job, required this.leg, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final stop = leg == NavLeg.toPickup ? 'pickup' : 'drop-off';
+    return Material(
+      color: DriverColors.accent.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+          child: Row(
+            children: [
+              const Icon(Icons.navigation_rounded, size: 18, color: DriverColors.accent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Navigating to the ${job.vehicle.displayName} $stop',
+                  style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+              ),
+              const Text('Open', style: TextStyle(fontSize: 13, color: DriverColors.accent, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A job that was opened but has since been completed or cancelled.
+class _NoActiveJob extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final VoidCallback onBack;
+
+  const _NoActiveJob({required this.title, required this.subtitle, required this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: AuroraBackground()),
+          Column(
+            children: [
+              GlassPageHeader(title: 'Active Mission', showBack: true, onBack: onBack),
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: GlassEmptyState(
+                      icon: Icons.check_circle_outline_rounded,
+                      title: title,
+                      subtitle: subtitle,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -668,8 +876,10 @@ class _JobSheet extends StatelessWidget {
   final Widget action;
   /// "Navigate to …" button for the current leg, when there is one.
   final Widget? navAction;
+  /// Note shown while guidance leads to a different job's stop.
+  final Widget? navigatingOther;
 
-  const _JobSheet({required this.job, required this.action, this.navAction});
+  const _JobSheet({required this.job, required this.action, this.navAction, this.navigatingOther});
 
   @override
   Widget build(BuildContext context) {
@@ -814,6 +1024,10 @@ class _JobSheet extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
+                if (navigatingOther != null) ...[
+                  navigatingOther!,
+                  const SizedBox(height: 10),
+                ],
                 if (navAction != null) ...[
                   navAction!,
                   const SizedBox(height: 10),

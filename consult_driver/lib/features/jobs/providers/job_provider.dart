@@ -77,9 +77,8 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
   /// Re-reads location access and restarts tracking for the active job.
   Future<void> recheckLocation() async {
     _stopLocationTracking();
-    final job = activeJob;
-    if (job != null) {
-      await _startLocationTracking(job.id);
+    if (hasActiveDelivery) {
+      await _startLocationTracking();
     } else {
       _locationAccess = await DriverLocationAccess.check();
       notifyListeners();
@@ -113,7 +112,7 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
 
         // Share location for the whole job, including the drive to pickup
         if (hasActiveDelivery) {
-          _startLocationTracking(activeJob!.id);
+          _startLocationTracking();
           if (!_navRestoreAttempted) {
             // Picks up guidance still running from before an app restart
             _navRestoreAttempted = true;
@@ -144,9 +143,30 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
       _allJobs.where((j) => j.status == JobStatus.assigned).toList();
 
   /// Jobs the driver has confirmed and is actively working on.
-  List<JobModel> get activeJobs => _allJobs.where((j) => j.isActive).toList();
+  /// Jobs the driver is working on, most urgent first: handovers (in transit),
+  /// then vehicles already picked up, then pickups, each by pickup time.
+  List<JobModel> get activeJobs {
+    int urgency(JobStatus s) => switch (s) {
+      JobStatus.inTransit => 0,
+      JobStatus.pickedUp => 1,
+      _ => 2,
+    };
+    final jobs = _allJobs.where((j) => j.isActive).toList();
+    jobs.sort((a, b) {
+      final byStatus = urgency(a.status).compareTo(urgency(b.status));
+      if (byStatus != 0) return byStatus;
+      final aAt = a.pickup.scheduledAt;
+      final bAt = b.pickup.scheduledAt;
+      if (aAt == null || bAt == null) return 0;
+      return aAt.compareTo(bAt);
+    });
+    return jobs;
+  }
+
+  JobModel? jobById(String id) => _allJobs.where((j) => j.id == id).firstOrNull;
 
   /// The single current active job (there should only be one at a time).
+  /// The most urgent active job.
   JobModel? get activeJob => activeJobs.isNotEmpty ? activeJobs.first : null;
 
   /// True when the driver currently has an active delivery.
@@ -185,7 +205,7 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
         confirmedAt: DateTime.now(),
       );
     }
-    _startLocationTracking(jobId);
+    _startLocationTracking();
 
     _isLoading = false;
     notifyListeners();
@@ -198,17 +218,15 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
       _stopLocationTracking();
       _lastNavPosted = null;
       _lastNavPostAt = null;
-    } else {
-      final job = activeJob;
-      if (job != null) _startLocationTracking(job.id);
+    } else if (hasActiveDelivery) {
+      _startLocationTracking();
     }
   }
 
   void _onNavLocation(NavLocation loc) {
     // The SDK reports positions whenever the session is open; only guidance
     // replaces the GPS stream, so ignore the rest to avoid double updates.
-    final job = activeJob;
-    if (job == null || !NavigationService.instance.guiding.value) return;
+    if (!hasActiveDelivery || !NavigationService.instance.guiding.value) return;
 
     final last = _lastNavPosted;
     final lastAt = _lastNavPostAt;
@@ -221,11 +239,11 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
     _lastNavPosted = loc;
     _lastNavPostAt = DateTime.now();
     _postLocation(
-      job.id,
       lat: loc.lat,
       lng: loc.lng,
       heading: loc.heading,
       speed: loc.speed,
+      navJobId: NavigationService.instance.jobId,
       etaS: loc.etaS,
       remainingM: loc.remainingM,
     );
@@ -292,9 +310,8 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
         );
       }
       // The pickup is done, so guidance to it is no longer needed
-      if (NavigationService.instance.leg == NavLeg.toPickup) {
-        await NavigationService.instance.stop();
-      }
+      final nav = NavigationService.instance;
+      if (nav.jobId == jobId && nav.leg == NavLeg.toPickup) await nav.stop();
     } catch (e) {
       debugPrint('API submitPickupCondition error: $e');
       rethrow;
@@ -324,20 +341,15 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
         break;
       case JobStatus.inTransit:
         statusStr = 'inTransit';
-        _startLocationTracking(jobId);
         break;
       case JobStatus.completed:
         statusStr = 'delivered';
         if (clientSignatureBase64 != null) {
           updates['clientSignatureBase64'] = clientSignatureBase64;
         }
-        _stopLocationTracking();
-        NavigationService.instance.stop();
         break;
       case JobStatus.cancelled:
         statusStr = 'cancelled';
-        _stopLocationTracking();
-        NavigationService.instance.stop();
         break;
     }
 
@@ -358,6 +370,18 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
         clientSignatureBase64: clientSignatureBase64 ?? _allJobs[idx].clientSignatureBase64,
         clientAcknowledgedAt: clientSignatureBase64 != null ? DateTime.now() : _allJobs[idx].clientAcknowledgedAt,
       );
+    }
+
+    final ended = newStatus == JobStatus.completed || newStatus == JobStatus.cancelled;
+    if (ended && NavigationService.instance.jobId == jobId) {
+      // Guidance led to this job's stop; other jobs keep their own
+      NavigationService.instance.stop();
+    }
+    // The driver may still be carrying other vehicles
+    if (hasActiveDelivery) {
+      _startLocationTracking();
+    } else {
+      _stopLocationTracking();
     }
 
     _isLoading = false;
@@ -403,7 +427,7 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _startLocationTracking(String jobId) async {
+  Future<void> _startLocationTracking() async {
     // fetchJobs runs every few seconds; don't open a second stream mid-start
     if (_positionStream != null || _startingTracking) return;
     // Guidance is already sending road-snapped positions
@@ -428,7 +452,6 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
           if (position != null) {
             driverPosition.value = position;
             _postLocation(
-              jobId,
               lat: position.latitude,
               lng: position.longitude,
               // Heading is only meaningful while moving; phones report 0 or -1 when still
@@ -445,18 +468,24 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _postLocation(
-    String jobId, {
+  /// Sends the driver's position for every active job: each of those clients
+  /// is tracking the same truck.
+  Future<void> _postLocation({
     required double lat,
     required double lng,
     double? heading,
     double? speed,
+    String? navJobId,
     double? etaS,
     double? remainingM,
   }) async {
+    final jobIds = activeJobs.map((j) => j.id).toList();
+    if (jobIds.isEmpty) return;
     try {
       await ApiClient.instance.post('/api/driver/location', {
-        'jobId': jobId,
+        'jobIds': jobIds,
+        // The ETA below belongs to this job only
+        'navJobId': ?navJobId,
         'lat': lat,
         'lng': lng,
         'heading': ?heading,
