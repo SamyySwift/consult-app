@@ -3,6 +3,7 @@ import { AppProvider } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { DispatchView } from './views/DispatchView';
+import { FleetMapView } from './views/FleetMapView';
 import { JobsView } from './views/JobsView';
 import { DriversView } from './views/DriversView';
 import { ClientsView } from './views/ClientsView';
@@ -17,6 +18,8 @@ function AppContent() {
     switch (currentView) {
       case 'dispatch':
         return <DispatchView />;
+      case 'map':
+        return <FleetMapView />;
       case 'jobs':
         return <JobsView />;
       case 'drivers':
@@ -37,6 +40,7 @@ function AppContent() {
   const getBreadcrumbTitle = () => {
     const map = {
       dispatch: 'Command Centre',
+      map: 'Live Fleet Map',
       jobs: 'Master Transport Log',
       drivers: 'Driver Management',
       partners: 'Partners & Affiliations',
@@ -50,6 +54,7 @@ function AppContent() {
   const getBreadcrumbSection = () => {
     const map = {
       dispatch: 'Dispatch',
+      map: 'Map',
       jobs: 'Jobs',
       drivers: 'Drivers',
       partners: 'Partners',

@@ -41,6 +41,11 @@ export function AppProvider({ children }) {
     return 'pending';
   };
 
+  const toNumber = (v) => {
+    const n = v == null || v === '' ? NaN : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
   const fetchDrivers = async () => {
     try {
       const data = await fetchAdminDrivers();
@@ -69,6 +74,11 @@ export function AppProvider({ children }) {
             customerPhone: clientPhone,
             driverId: b.driver_id,
             driverName: driverName,
+            driverPhone: b.driver_phone || null,
+            // Last position the driver app reported for this job
+            driverLocation: toNumber(b.driver_lat) != null && toNumber(b.driver_lng) != null
+              ? { lat: toNumber(b.driver_lat), lng: toNumber(b.driver_lng), at: b.driver_location_at || null }
+              : null,
             vehicle: {
               type: (b.vehicle_type || 'sedan').toLowerCase(),
               make: b.vehicle_make || 'Vehicle',
@@ -79,9 +89,13 @@ export function AppProvider({ children }) {
             pickup: {
               address: b.pickup_address || 'Lagos, Nigeria',
               scheduledAt: b.pickup_datetime ? formatRelativeTime(b.pickup_datetime) : 'Scheduled',
+              lat: toNumber(b.pickup_lat),
+              lng: toNumber(b.pickup_lng),
             },
             dropoff: {
               address: b.dropoff_address || 'Abuja, Nigeria',
+              lat: toNumber(b.dropoff_lat),
+              lng: toNumber(b.dropoff_lng),
             },
             serviceType: b.service_type || 'Standard',
             transportMode: b.transport_mode ? (b.transport_mode.includes('enclosed') ? 'Enclosed Transport' : 'Open Transport') : 'Open Transport',
