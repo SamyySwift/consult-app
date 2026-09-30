@@ -39,3 +39,6 @@ Podfile.lock
 *.swo
 
 .env
+
+# Playwright MCP output
+.playwright-mcp/
