@@ -8,8 +8,11 @@ import {
   useAdvancedMarkerRef,
   useMap,
 } from '@vis.gl/react-google-maps';
-import { Maximize2, Phone, Truck } from 'lucide-react';
+import { ChevronRight, Map as MapIcon, MapPin, Maximize2, Phone, Truck } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { vehicleName } from '../lib/format';
+import { MAP_LOOK, STALE_LOOK } from '../lib/status';
+import { Avatar, EmptyState, Eyebrow, SurfaceCard } from '../components/ui';
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 // Advanced markers need a map ID; Google's demo ID works until one is created
@@ -19,13 +22,7 @@ const ABUJA = { lat: 9.0765, lng: 7.3986 };
 const STALE_AFTER_MS = 2 * 60 * 1000;
 
 // Statuses where the driver has the job and reports their position, most urgent first
-const STATUSES = {
-  inTransit: { label: 'In transit', color: '#C9913A', ink: '#080E1C' },
-  pickedUp: { label: 'Picked up', color: '#3B82F6', ink: '#FFFFFF' },
-  confirmed: { label: 'Heading to pickup', color: '#F0F4FF', ink: '#080E1C' },
-};
-const URGENCY = Object.keys(STATUSES);
-const STALE_LOOK = { color: '#3D5070', ink: '#B4C0D3' };
+const URGENCY = ['inTransit', 'pickedUp', 'confirmed'];
 
 const timeOf = (at) => {
   const t = at ? new Date(at).getTime() : NaN;
@@ -50,9 +47,6 @@ function freshness(at, now) {
     ? { live: true, label: `Live · ${formatAgo(age)}` }
     : { live: false, label: `Last seen ${formatAgo(age)}` };
 }
-
-const vehicleName = (job) =>
-  [job.vehicle.year, job.vehicle.make, job.vehicle.model].filter(Boolean).join(' ');
 
 const byUrgency = (a, b) => URGENCY.indexOf(a.status) - URGENCY.indexOf(b.status);
 
@@ -127,14 +121,16 @@ export function FleetMapView() {
   if (!API_KEY || authFailed) {
     return (
       <div className="absolute inset-0 grid place-items-center p-8">
-        <div className="max-w-md bg-navy-mid border border-navy-border rounded-xl p-6 text-center">
-          <h2 className="font-syne text-[18px] font-bold text-text-primary mb-2">Map unavailable</h2>
-          <p className="text-[13px] text-text-mid leading-relaxed">
-            {API_KEY
+        <EmptyState
+          icon={MapIcon}
+          title="Map unavailable"
+          className="max-w-md"
+          subtitle={
+            API_KEY
               ? 'Google rejected the map key. Enable the Maps JavaScript API in Google Cloud and allow it on this key, then reload.'
-              : 'Add VITE_GOOGLE_MAPS_API_KEY to admin_dashboard/.env and restart the dashboard. The key needs the Maps JavaScript API enabled.'}
-          </p>
-        </div>
+              : 'Add VITE_GOOGLE_MAPS_API_KEY to admin_dashboard/.env and restart the dashboard. The key needs the Maps JavaScript API enabled.'
+          }
+        />
       </div>
     );
   }
@@ -192,57 +188,55 @@ function FleetMap() {
   };
 
   return (
-    <div className="absolute inset-0 flex">
-      <aside className="w-[340px] shrink-0 bg-navy-mid border-r border-navy-border overflow-y-auto scrollbar-thin">
-        <div className="p-5 border-b border-navy-border">
-          <h2 className="font-syne text-[16px] font-bold text-text-primary">Vehicles on the move</h2>
-          <p className="text-[12px] text-text-mid mt-1">
+    <div className="absolute inset-0 flex gap-4 px-8 pb-8">
+      <aside className="w-[340px] shrink-0 flex flex-col min-h-0">
+        <div className="pb-4 px-1 shrink-0">
+          <h2 className="text-[18px] font-bold text-white">Vehicles on the move</h2>
+          <p className="text-[13px] text-white/55 mt-1">
             {vehicleCount} {vehicleCount === 1 ? 'vehicle' : 'vehicles'} · {counts.live} live
             {counts.stale > 0 && ` · ${counts.stale} not updated recently`}
             {waitingCount > 0 && ` · ${waitingCount} no location`}
           </p>
-          <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3">
-            {URGENCY.map((s) => (
-              <Legend key={s} color={STATUSES[s].color} label={STATUSES[s].label} />
-            ))}
-            <Legend color={STALE_LOOK.color} label="Over 2 min old" />
-          </div>
         </div>
 
-        {groups.length === 0 && (
-          <p className="p-5 text-[13px] text-text-dim">No vehicles are being moved right now.</p>
-        )}
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col gap-2.5 pr-1">
+          {groups.length === 0 && (
+            <SurfaceCard radius="rounded-[22px]" className="p-5 text-[13px] text-white/55">
+              No vehicles are being moved right now.
+            </SurfaceCard>
+          )}
 
-        {located.map((group) => (
-          <DriverRow
-            key={group.key}
-            group={group}
-            now={now}
-            selectedJobId={selection?.key === group.key ? selection.jobId : null}
-            onSelectJob={(job) => focusJob(group, job)}
-          />
-        ))}
+          {located.map((group) => (
+            <DriverRow
+              key={group.key}
+              group={group}
+              now={now}
+              selectedJobId={selection?.key === group.key ? selection.jobId : null}
+              onSelectJob={(job) => focusJob(group, job)}
+            />
+          ))}
 
-        {waiting.length > 0 && (
-          <div className="px-5 pt-5 pb-2">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim">Waiting for location</h3>
-            <p className="text-[11px] text-text-dim mt-1">
-              The driver app hasn't sent a position yet. It may be closed or have location turned off.
-            </p>
-          </div>
-        )}
-        {waiting.map((group) => (
-          <DriverRow
-            key={group.key}
-            group={group}
-            now={now}
-            selectedJobId={null}
-            onSelectJob={(job) => setSelectedJobId(job.id)}
-          />
-        ))}
+          {waiting.length > 0 && (
+            <div className="px-1 pt-3 pb-1">
+              <Eyebrow>Waiting for location</Eyebrow>
+              <p className="text-[12px] text-white/45 mt-1.5">
+                The driver app hasn't sent a position yet. It may be closed or have location turned off.
+              </p>
+            </div>
+          )}
+          {waiting.map((group) => (
+            <DriverRow
+              key={group.key}
+              group={group}
+              now={now}
+              selectedJobId={null}
+              onSelectJob={(job) => setSelectedJobId(job.id)}
+            />
+          ))}
+        </div>
       </aside>
 
-      <div className="flex-1 relative">
+      <div className="flex-1 relative min-w-0 rounded-card overflow-hidden border border-line">
         <GoogleMap
           mapId={MAP_ID}
           colorScheme={ColorScheme.DARK}
@@ -269,20 +263,28 @@ function FleetMap() {
             />
           ))}
           {selectedJob && hasPoint(selectedJob.pickup) && (
-            <StopMarker position={selectedJob.pickup} letter="P" title={`Pickup: ${selectedJob.pickup.address}`} />
+            <PickupMarker position={selectedJob.pickup} title={`Pickup: ${selectedJob.pickup.address}`} />
           )}
           {selectedJob && hasPoint(selectedJob.dropoff) && (
-            <StopMarker position={selectedJob.dropoff} letter="D" title={`Drop-off: ${selectedJob.dropoff.address}`} />
+            <DropoffMarker position={selectedJob.dropoff} title={`Drop-off: ${selectedJob.dropoff.address}`} />
           )}
         </GoogleMap>
+
+        {/* Glass floats over the map, where there is imagery to blur */}
+        <div className="glass absolute left-4 bottom-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 max-w-[calc(100%-2rem)] px-4 py-2.5 rounded-[22px]">
+          {URGENCY.map((s) => (
+            <Legend key={s} color={MAP_LOOK[s].dot} label={MAP_LOOK[s].label} />
+          ))}
+          <Legend color={STALE_LOOK.dot} label="Over 2 min old" />
+        </div>
 
         {located.length > 0 && (
           <button
             type="button"
             onClick={fitAll}
-            className="absolute top-4 right-4 flex items-center gap-2 px-3.5 py-2 rounded-[10px] bg-navy-mid/95 border border-navy-border text-[12px] font-medium text-text-primary hover:bg-navy-light transition-colors cursor-pointer"
+            className="glass absolute top-4 right-4 flex items-center gap-2 h-10 px-4 rounded-full text-[13px] font-semibold text-white cursor-pointer transition-colors hover:bg-white/8"
           >
-            <Maximize2 size={14} /> Fit all
+            <Maximize2 size={15} strokeWidth={2.2} /> Fit all
           </button>
         )}
       </div>
@@ -292,9 +294,20 @@ function FleetMap() {
 
 function Legend({ color, label }) {
   return (
-    <span className="flex items-center gap-1.5 text-[11px] text-text-mid">
-      <span className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
+    <span className="flex items-center gap-1.5 text-[12px] font-medium text-white/85">
+      <span className="size-2.5 rounded-full" style={{ background: color }} />
       {label}
+    </span>
+  );
+}
+
+function Freshness({ fresh }) {
+  return (
+    <span className={`flex items-center gap-1.5 text-[12px] font-medium ${fresh.live ? 'text-accent-light' : 'text-warning'}`}>
+      <span
+        className={`size-1.5 rounded-full ${fresh.live ? 'bg-accent animate-pulse-dot shadow-[0_0_6px_rgb(0_200_83/0.7)]' : 'bg-warning'}`}
+      />
+      {fresh.label}
     </span>
   );
 }
@@ -302,46 +315,44 @@ function Legend({ color, label }) {
 function DriverRow({ group, now, selectedJobId, onSelectJob }) {
   const fresh = group.location ? freshness(group.location.at, now) : null;
   return (
-    <div className="px-5 py-4 border-b border-navy-border">
-      <div className="flex items-center gap-2">
-        <span className="text-[13px] font-semibold text-text-primary truncate">{group.driverName}</span>
-        {fresh && (
-          <span className={`ml-auto shrink-0 text-[11px] ${fresh.live ? 'text-success' : 'text-warning'}`}>
-            {fresh.label}
-          </span>
-        )}
+    <SurfaceCard radius="rounded-[22px]" className="p-3.5 shrink-0">
+      <div className="flex items-center gap-3 px-1">
+        <Avatar name={group.driverName} size={36} />
+        <div className="min-w-0 flex-1">
+          <div className="text-[14px] font-semibold text-white truncate">{group.driverName}</div>
+          {fresh && <Freshness fresh={fresh} />}
+        </div>
       </div>
-      <div className="mt-2 flex flex-col gap-1.5">
+      <div className="mt-2.5 flex flex-col gap-1">
         {group.jobs.map((job) => (
           <button
             key={job.id}
             type="button"
             onClick={() => onSelectJob(job)}
-            className={`text-left rounded-lg px-3 py-2 border transition-colors cursor-pointer ${
-              job.id === selectedJobId
-                ? 'bg-navy-light border-navy-border'
-                : 'bg-transparent border-transparent hover:bg-navy-light/60'
+            className={`w-full text-left rounded-[14px] px-3 py-2 cursor-pointer transition-colors ${
+              job.id === selectedJobId ? 'bg-white/10' : 'hover:bg-white/5'
             }`}
           >
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: STATUSES[job.status].color }} />
-              <span className="text-[12px] font-medium text-text-primary truncate">{vehicleName(job)}</span>
+              <span className="size-2 rounded-full shrink-0" style={{ background: MAP_LOOK[job.status].dot }} />
+              <span className="text-[13px] font-semibold text-white truncate">{vehicleName(job)}</span>
             </div>
-            <div className="text-[11px] text-text-mid mt-0.5 truncate">
-              {STATUSES[job.status].label} · {job.customerName}
+            <div className="text-[12px] text-white/55 mt-0.5 truncate pl-4">
+              {MAP_LOOK[job.status].label} · {job.customerName}
             </div>
           </button>
         ))}
       </div>
-    </div>
+    </SurfaceCard>
   );
 }
 
 function DriverMarker({ group, now, selected, selectedJobId, onSelect, onSelectJob, onClose, onOpenJob }) {
   const [markerRef, marker] = useAdvancedMarkerRef();
   const fresh = freshness(group.location.at, now);
-  const look = fresh.live ? STATUSES[group.status] : STALE_LOOK;
+  const look = fresh.live ? MAP_LOOK[group.status] : STALE_LOOK;
   const count = group.jobs.length;
+  const glow = fresh.live && group.status === 'inTransit' ? ', 0 0 20px rgb(0 200 83 / 0.45)' : '';
 
   return (
     <>
@@ -355,18 +366,18 @@ function DriverMarker({ group, now, selected, selectedJobId, onSelect, onSelectJ
         onClick={onSelect}
       >
         <div
-          className="relative w-10 h-10 rounded-full grid place-items-center border-2 border-navy"
+          className="relative size-11 rounded-full grid place-items-center border-2 border-black"
           style={{
-            background: look.color,
+            background: look.fill,
             color: look.ink,
             boxShadow: selected
-              ? `0 0 0 5px ${look.color}55, 0 4px 14px rgba(0,0,0,.5)`
-              : '0 4px 14px rgba(0,0,0,.5)',
+              ? `0 0 0 5px ${look.dot}55, 0 4px 14px rgb(0 0 0 / 0.5)${glow}`
+              : `0 4px 14px rgb(0 0 0 / 0.5)${glow}`,
           }}
         >
-          <Truck size={18} strokeWidth={2.2} />
+          <Truck size={20} strokeWidth={2.2} />
           {count > 1 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-accent-red text-white text-[11px] font-bold grid place-items-center border-2 border-navy">
+            <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-error text-white text-[11px] font-bold grid place-items-center border-2 border-black">
               {count}
             </span>
           )}
@@ -377,14 +388,13 @@ function DriverMarker({ group, now, selected, selectedJobId, onSelect, onSelectJ
         <InfoWindow
           anchor={marker}
           onClose={onClose}
-          headerContent={<span className="text-[14px] font-semibold text-[#0D1829]">{group.driverName}</span>}
+          headerContent={<span className="text-[15px] font-bold text-white">{group.driverName}</span>}
         >
-          <div className="min-w-[240px] max-w-[300px] text-[#0D1829]">
-            <div className="flex items-center gap-2 text-[12px] text-[#4B5B76]">
-              <span className="w-2 h-2 rounded-full" style={{ background: fresh.live ? '#22C55E' : '#F59E0B' }} />
-              {fresh.label}
+          <div className="min-w-[240px] max-w-[300px] text-white">
+            <div className="flex items-center gap-2">
+              <Freshness fresh={fresh} />
               {group.driverPhone && (
-                <a href={`tel:${group.driverPhone}`} className="ml-auto flex items-center gap-1 text-[#0D1829] font-medium">
+                <a href={`tel:${group.driverPhone}`} className="ml-auto flex items-center gap-1 text-[12px] font-medium text-white/85">
                   <Phone size={12} /> {group.driverPhone}
                 </a>
               )}
@@ -392,23 +402,23 @@ function DriverMarker({ group, now, selected, selectedJobId, onSelect, onSelectJ
             {group.jobs.map((job) => (
               <div
                 key={job.id}
-                className={`mt-2 pt-2 border-t border-[#E5E9F0] ${job.id === selectedJobId ? '' : 'opacity-80'}`}
+                className={`mt-2.5 pt-2.5 border-t border-white/8 ${job.id === selectedJobId ? '' : 'opacity-70'}`}
               >
                 <button type="button" onClick={() => onSelectJob(job)} className="text-left w-full cursor-pointer">
-                  <div className="text-[13px] font-semibold">{vehicleName(job)}</div>
-                  <div className="text-[12px] text-[#4B5B76]">
-                    {STATUSES[job.status].label} · {job.customerName}
+                  <div className="text-[13px] font-bold">{vehicleName(job)}</div>
+                  <div className="text-[12px] text-white/55">
+                    {MAP_LOOK[job.status].label} · {job.customerName}
                   </div>
-                  <div className="text-[11px] text-[#6B7A94] mt-0.5">
+                  <div className="text-[11px] text-white/45 mt-0.5">
                     {job.pickup.address} → {job.dropoff.address}
                   </div>
                 </button>
                 <button
                   type="button"
                   onClick={() => onOpenJob(job)}
-                  className="mt-1 text-[12px] font-semibold text-accent-red-dark cursor-pointer"
+                  className="mt-1.5 flex items-center gap-0.5 text-[12px] font-semibold text-accent-light cursor-pointer"
                 >
-                  Open job
+                  Open job <ChevronRight size={14} strokeWidth={2.4} />
                 </button>
               </div>
             ))}
@@ -419,11 +429,20 @@ function DriverMarker({ group, now, selected, selectedJobId, onSelect, onSelectJ
   );
 }
 
-function StopMarker({ position, letter, title }) {
+/** Pickup: a glowing green dot, as on the client's tracking map. */
+function PickupMarker({ position, title }) {
   return (
     <AdvancedMarker position={{ lat: position.lat, lng: position.lng }} title={title} anchorLeft="-50%" anchorTop="-50%" zIndex={50}>
-      <div className="w-7 h-7 rounded-full grid place-items-center bg-navy border-2 border-text-primary text-text-primary text-[12px] font-bold shadow-[0_4px_12px_rgba(0,0,0,.5)]">
-        {letter}
+      <div className="size-4 rounded-full bg-accent border-[3px] border-black shadow-[0_0_0_4px_rgb(0_200_83/0.3),0_4px_12px_rgb(0_0_0/0.5)]" />
+    </AdvancedMarker>
+  );
+}
+
+function DropoffMarker({ position, title }) {
+  return (
+    <AdvancedMarker position={{ lat: position.lat, lng: position.lng }} title={title} anchorLeft="-50%" anchorTop="-50%" zIndex={50}>
+      <div className="size-8 rounded-full grid place-items-center bg-[#1A1C1B] border-2 border-white text-white shadow-[0_4px_12px_rgb(0_0_0/0.5)]">
+        <MapPin size={15} strokeWidth={2.4} />
       </div>
     </AdvancedMarker>
   );

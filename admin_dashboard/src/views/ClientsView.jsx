@@ -1,5 +1,8 @@
 import React, { useState, useMemo } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { formatNaira, shortRef } from '../lib/format';
+import { Avatar, Badge, EmptyRow, Eyebrow, SearchField, StatsStrip, StatusBadge, TableCard, Td, Th, Toolbar, Tr } from '../components/ui';
 
 export function ClientsView() {
   const { jobs, setSelectedJobId } = useAppContext();
@@ -56,160 +59,106 @@ export function ClientsView() {
   const totalRevenue = clients.reduce((s, c) => s + c.totalSpent, 0);
   const activeClients = clients.filter(c => c.hasActiveJob).length;
 
-  const STATUS_COLORS = {
-    pending:   'bg-navy-light text-text-mid',
-    assigned:  'bg-warning-bg text-warning',
-    confirmed: 'bg-info-bg text-info',
-    pickedUp:  'bg-info-bg text-info',
-    inTransit: 'bg-amber-glow text-amber',
-    completed: 'bg-success-bg text-success',
-    delivered: 'bg-success-bg text-success',
-    cancelled: 'bg-error-bg text-accent-red',
-  };
-  const STATUS_LABELS = {
-    pending: 'Pending', assigned: 'Assigned', confirmed: 'Confirmed',
-    pickedUp: 'Picked Up', inTransit: 'In Transit', completed: 'Delivered',
-    delivered: 'Delivered', cancelled: 'Cancelled',
-  };
-
   return (
-    <div className="flex flex-col flex-1 p-8 gap-6 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between shrink-0">
-        <div>
-          <h2 className="font-syne text-[18px] font-bold text-text-primary tracking-tight">
-            Client Management
-          </h2>
-          <p className="text-[12px] text-text-dim mt-0.5">{clients.length} unique clients</p>
-        </div>
-        <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-          </svg>
-          <input
-            type="text"
-            placeholder="Search by name or phone…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-64 pl-9 pr-4 py-2 bg-navy-mid border border-navy-border rounded-lg text-[13px] text-text-primary placeholder:text-text-dim focus:outline-none focus:border-info transition-colors"
-          />
-        </div>
-      </div>
+    <div className="flex flex-col flex-1 min-h-0 px-8 pb-8 gap-5 overflow-hidden">
+      <Toolbar summary={`${clients.length} unique clients`}>
+        <SearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by name or phone…"
+          className="w-80"
+        />
+      </Toolbar>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-3 gap-3 shrink-0">
-        {[
-          { label: 'Total Clients', value: clients.length, display: clients.length, color: 'text-text-primary', sub: 'unique customers' },
-          { label: 'Active Now', value: activeClients, display: activeClients, color: 'text-amber', sub: 'with ongoing bookings' },
-          { label: 'Total Revenue', value: totalRevenue, display: `₦${totalRevenue.toLocaleString('en-NG')}`, color: 'text-success', sub: 'from all clients' },
-        ].map(kpi => (
-          <div key={kpi.label} className="bg-navy-mid border border-navy-border rounded-xl p-5 flex flex-col gap-1">
-            <div className="text-[11px] text-text-mid uppercase tracking-[0.06em] font-medium">{kpi.label}</div>
-            <div className={`font-syne font-extrabold text-[32px] leading-none tracking-tight ${kpi.color}`}>{kpi.display}</div>
-            <div className="text-[11px] text-text-dim font-mono">{kpi.sub}</div>
-          </div>
-        ))}
-      </div>
+      <StatsStrip
+        items={[
+          { label: 'Total clients', value: clients.length },
+          { label: 'Active now', value: activeClients, tone: 'text-accent' },
+          { label: 'Total revenue', value: formatNaira(totalRevenue) },
+        ]}
+      />
 
-      {/* Client Table */}
-      <div className="flex-1 overflow-auto rounded-xl border border-navy-border bg-navy-mid min-h-0">
-        <table className="w-full text-left border-collapse">
-          <thead className="sticky top-0 z-10 bg-navy-light border-b border-navy-border">
-            <tr className="text-[11px] uppercase tracking-[0.05em] text-text-mid">
-              <th className="px-4 py-3 font-medium">Client</th>
-              <th className="px-4 py-3 font-medium">Phone</th>
-              <th className="px-4 py-3 font-medium">Bookings</th>
-              <th className="px-4 py-3 font-medium">Total Spent</th>
-              <th className="px-4 py-3 font-medium">Last Booking</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium w-10"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="text-center py-16 text-text-dim text-[13px]">
-                  {search ? 'No clients match your search.' : 'No clients found.'}
-                </td>
-              </tr>
-            ) : (
-              filtered.map(client => (
+      <TableCard>
+        <thead>
+          <tr>
+            <Th>Client</Th>
+            <Th>Phone</Th>
+            <Th>Bookings</Th>
+            <Th>Total Spent</Th>
+            <Th>Last Booking</Th>
+            <Th>Status</Th>
+            <Th className="w-10" />
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.length === 0 ? (
+            <EmptyRow colSpan={7}>{search ? 'No clients match your search.' : 'No clients found.'}</EmptyRow>
+          ) : (
+            filtered.map(client => {
+              const expanded = expandedClient === client.id;
+              return (
                 <React.Fragment key={client.id}>
-                  <tr
-                    className="border-b border-navy-border hover:bg-navy/60 transition-colors cursor-pointer"
-                    onClick={() => setExpandedClient(expandedClient === client.id ? null : client.id)}
+                  <Tr
+                    onClick={() => setExpandedClient(expanded ? null : client.id)}
+                    className={expanded ? 'bg-white/3' : ''}
                   >
-                    <td className="px-4 py-3.5">
+                    <Td>
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-navy-light border border-navy-border flex items-center justify-center text-[13px] font-bold text-text-mid shrink-0">
-                          {client.name.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="text-[13px] font-medium text-text-primary">{client.name}</span>
+                        <Avatar name={client.name} size={34} />
+                        <span className="font-semibold text-white">{client.name}</span>
                       </div>
-                    </td>
-                    <td className="px-4 py-3.5 font-mono text-[12px] text-text-mid">{client.phone}</td>
-                    <td className="px-4 py-3.5">
-                      <span className="font-syne font-bold text-[20px] text-text-primary">{client.totalBookings}</span>
-                    </td>
-                    <td className="px-4 py-3.5 font-mono text-[13px] text-amber font-medium">
-                      ₦{client.totalSpent.toLocaleString('en-NG')}
-                    </td>
-                    <td className="px-4 py-3.5 text-[12px] text-text-dim">{client.lastBookingDate || '—'}</td>
-                    <td className="px-4 py-3.5">
+                    </Td>
+                    <Td className="text-white/70 tabular-nums">{client.phone}</Td>
+                    <Td className="text-[15px] font-bold text-white tabular-nums">{client.totalBookings}</Td>
+                    <Td className="font-bold text-white tabular-nums whitespace-nowrap">{formatNaira(client.totalSpent)}</Td>
+                    <Td className="text-[12px] text-white/55">{client.lastBookingDate || '—'}</Td>
+                    <Td>
                       {client.hasActiveJob ? (
-                        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-[0.05em] bg-amber-glow text-amber flex items-center gap-1.5 w-fit">
-                          <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
-                          Active
-                        </span>
+                        <Badge tone="live" compact pulse>Active</Badge>
                       ) : (
-                        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-[0.05em] bg-navy-light text-text-dim w-fit">
-                          Inactive
-                        </span>
+                        <Badge compact>Inactive</Badge>
                       )}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <svg
-                        viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                        className={`w-4 h-4 text-text-dim transition-transform duration-200 ${expandedClient === client.id ? 'rotate-90' : ''}`}
-                      >
-                        <path d="m9 18 6-6-6-6"/>
-                      </svg>
-                    </td>
-                  </tr>
+                    </Td>
+                    <Td>
+                      <ChevronRight
+                        size={17}
+                        className={`text-white/40 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
+                      />
+                    </Td>
+                  </Tr>
 
                   {/* Expanded job history */}
-                  {expandedClient === client.id && (
-                    <tr className="border-b border-navy-border bg-navy/40">
-                      <td colSpan={7} className="px-4 py-3">
-                        <div className="text-[11px] text-text-mid uppercase tracking-[0.05em] font-medium mb-2">
-                          Booking History ({client.jobs.length})
-                        </div>
+                  {expanded && (
+                    <tr className="border-b border-white/6 bg-white/3">
+                      <td colSpan={7} className="px-4 pt-1 pb-4">
+                        <Eyebrow className="mb-2.5">Booking History ({client.jobs.length})</Eyebrow>
                         <div className="flex flex-col gap-1.5">
                           {client.jobs.map(job => (
-                            <div
+                            <button
                               key={job.id}
-                              className="flex items-center gap-4 bg-navy-mid border border-navy-border rounded-lg px-3 py-2.5 cursor-pointer hover:border-navy-light transition-colors"
+                              type="button"
+                              className="flex items-center gap-4 w-full text-left rounded-[16px] border border-white/6 bg-surface-variant/60 px-3.5 py-2.5 cursor-pointer transition-colors hover:border-white/15"
                               onClick={(e) => { e.stopPropagation(); setSelectedJobId(job.id); }}
                             >
-                              <span className="font-mono text-[11px] text-text-dim">{job.id}</span>
-                              <span className="text-[12px] text-text-mid flex-1 truncate">{job.pickup?.address} → {job.dropoff?.address}</span>
-                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase ${STATUS_COLORS[job.status] || 'bg-navy-light text-text-dim'}`}>
-                                {STATUS_LABELS[job.status] || job.status}
+                              <span className="text-[12px] font-semibold text-white/60 tabular-nums">#{shortRef(job.id)}</span>
+                              <span className="flex-1 truncate text-[13px] text-white/85">
+                                {job.pickup?.address} → {job.dropoff?.address}
                               </span>
-                              <span className="font-mono text-[12px] text-amber">₦{(job.totalAmount || 0).toLocaleString('en-NG')}</span>
-                              <span className="text-[11px] text-text-dim shrink-0">{job.createdAt}</span>
-                            </div>
+                              <StatusBadge status={job.status} compact />
+                              <span className="text-[13px] font-bold text-white tabular-nums">{formatNaira(job.totalAmount)}</span>
+                              <span className="shrink-0 text-[12px] text-white/45">{job.createdAt}</span>
+                            </button>
                           ))}
                         </div>
                       </td>
                     </tr>
                   )}
                 </React.Fragment>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              );
+            })
+          )}
+        </tbody>
+      </TableCard>
     </div>
   );
 }

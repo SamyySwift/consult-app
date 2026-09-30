@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { Percent, Save, Tag } from 'lucide-react';
 import {
   fetchPricing as apiFetchPricing,
   savePricing as apiSavePricing,
   fetchInsuranceSettings,
   saveInsuranceSettings,
 } from '../lib/api';
+import { Alert, Button, CardHeader, Input, Loading, SurfaceCard, Td, Th, Toolbar, Tr } from '../components/ui';
 
 function formatAmount(value) {
   if (value === null || value === undefined) return '0';
@@ -22,6 +24,15 @@ function formatDbAmount(value) {
 function parseAmount(value) {
   if (!value) return 0;
   return parseInt(String(value).replace(/\D/g, ''), 10) || 0;
+}
+
+function NairaInput({ value, onChange, label }) {
+  return (
+    <div className="relative max-w-[180px]">
+      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[14px] font-semibold text-white/45 pointer-events-none">₦</span>
+      <Input value={value} onChange={onChange} aria-label={label} inputMode="numeric" className="pl-9 tabular-nums" />
+    </div>
+  );
 }
 
 export function SettingsView() {
@@ -47,7 +58,7 @@ export function SettingsView() {
     setLoading(true);
     try {
       const data = await apiFetchPricing();
-      
+
       const formatted = (data || []).map(p => ({
         ...p,
         base_price_str: formatDbAmount(p.base_price),
@@ -95,99 +106,87 @@ export function SettingsView() {
   };
 
   if (loading) {
-    return (
-      <div className="flex-1 p-8 flex items-center justify-center text-text-mid">
-        Loading configuration...
-      </div>
-    );
+    return <Loading label="Loading configuration…" />;
   }
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="font-syne text-[18px] font-bold text-text-primary tracking-tight">
-          Pricing Configuration
-        </h2>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className={`px-4 py-2 rounded-lg text-[13px] font-semibold text-white transition-colors ${
-            saving ? 'bg-navy-border cursor-not-allowed' : 'bg-info hover:bg-info/90'
-          }`}
-        >
-          {saving ? 'Saving...' : 'Save Changes'}
-        </button>
-      </div>
+    <div className="flex flex-col gap-5 px-8 pb-10 max-w-[1000px]">
+      <Toolbar summary={`${pricingData.length} service tiers`}>
+        <Button icon={Save} onClick={handleSave} loading={saving}>
+          {saving ? 'Saving…' : 'Save Changes'}
+        </Button>
+      </Toolbar>
 
-      {message && (
-        <div className={`mb-6 p-4 rounded-lg text-[13px] font-medium ${message.type === 'success' ? 'bg-success-bg text-success border border-success/20' : 'bg-error-bg text-accent-red border border-accent-red/20'}`}>
-          {message.text}
-        </div>
-      )}
+      {message && <Alert tone={message.type}>{message.text}</Alert>}
 
-      <div className="bg-navy-mid border border-navy-border rounded-xl p-5 mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div className="font-semibold text-text-primary text-[13px]">Insurance Percentage</div>
-            <div className="text-[11px] text-text-mid mt-0.5">
-              Insurance fee charged as a percentage of the client's estimated vehicle worth.
+      <SurfaceCard className="p-5">
+        <CardHeader
+          icon={Percent}
+          title="Insurance Percentage"
+          subtitle="Insurance fee charged as a percentage of the client's estimated vehicle worth."
+          action={
+            <div className="flex items-center gap-2">
+              <div className="w-[110px]">
+                <Input
+                  inputMode="decimal"
+                  aria-label="Insurance percentage"
+                  value={insurancePct}
+                  onChange={(e) => handleInsurancePctChange(e.target.value)}
+                  className="text-right tabular-nums"
+                />
+              </div>
+              <span className="text-[15px] font-semibold text-white/55">%</span>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              inputMode="decimal"
-              value={insurancePct}
-              onChange={(e) => handleInsurancePctChange(e.target.value)}
-              className="w-[100px] bg-navy border border-navy-border rounded-md px-3 py-2 text-[13px] text-text-primary focus:outline-none focus:border-info font-mono text-right"
-            />
-            <span className="text-text-mid text-[13px]">%</span>
-          </div>
-        </div>
+          }
+        />
         {parseFloat(insurancePct) > 0 && (
-          <div className="text-[11px] text-text-mid mt-3">
+          <p className="mt-4 pl-[60px] text-[12px] text-white/55">
             e.g. a ₦10,000,000 vehicle will pay ₦{Math.round(100000 * parseFloat(insurancePct)).toLocaleString('en-US')} for insurance.
-          </div>
+          </p>
         )}
-      </div>
+      </SurfaceCard>
 
-      <div className="bg-navy-mid border border-navy-border rounded-xl overflow-hidden">
+      <SurfaceCard className="overflow-hidden">
+        <CardHeader
+          icon={Tag}
+          title="Service Tiers"
+          subtitle="Base price and enclosed add-on for each tier, in naira."
+          className="p-5"
+        />
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-navy-light border-b border-navy-border text-[11px] uppercase tracking-[0.05em] text-text-mid">
-              <th className="p-4 font-medium w-1/4">Service Tier</th>
-              <th className="p-4 font-medium">Base Price (₦)</th>
-              <th className="p-4 font-medium">Enclosed Add-on (₦)</th>
+            <tr>
+              <Th className="w-1/3 border-t">Service Tier</Th>
+              <Th className="border-t">Base Price</Th>
+              <Th className="border-t">Enclosed Add-on</Th>
             </tr>
           </thead>
           <tbody>
             {pricingData.map((p, i) => (
-              <tr key={p.id} className="border-b border-navy-border last:border-0 hover:bg-navy/30 transition-colors">
-                <td className="p-4">
-                  <div className="font-semibold text-text-primary text-[13px]">{p.name}</div>
-                  <div className="text-[11px] text-text-mid mt-0.5">{p.description}</div>
-                </td>
-                <td className="p-4">
-                  <input
-                    type="text"
+              <Tr key={p.id}>
+                <Td>
+                  <div className="font-semibold text-white">{p.name}</div>
+                  <div className="text-[12px] text-white/50 mt-0.5">{p.description}</div>
+                </Td>
+                <Td>
+                  <NairaInput
+                    label={`${p.name} base price`}
                     value={p.base_price_str}
                     onChange={(e) => handleChange(i, 'base_price_str', e.target.value)}
-                    className="w-full max-w-[150px] bg-navy border border-navy-border rounded-md px-3 py-2 text-[13px] text-text-primary focus:outline-none focus:border-info font-mono"
                   />
-                </td>
-                <td className="p-4">
-                  <input
-                    type="text"
+                </Td>
+                <Td>
+                  <NairaInput
+                    label={`${p.name} enclosed add-on`}
                     value={p.enclosed_addon_str}
                     onChange={(e) => handleChange(i, 'enclosed_addon_str', e.target.value)}
-                    className="w-full max-w-[150px] bg-navy border border-navy-border rounded-md px-3 py-2 text-[13px] text-text-primary focus:outline-none focus:border-info font-mono"
                   />
-                </td>
-              </tr>
+                </Td>
+              </Tr>
             ))}
           </tbody>
         </table>
-      </div>
+      </SurfaceCard>
     </div>
   );
 }
