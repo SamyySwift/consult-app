@@ -650,8 +650,19 @@ driverRouter.post('/location', async (req: Request, res: Response): Promise<void
   const etaS = finiteOrUndefined(req.body.eta_s);
   const remainingM = finiteOrUndefined(req.body.remaining_m);
 
+  // A driver can carry several vehicles, so the app sends every active job.
+  // Older app builds send a single jobId (whose ETA, if any, is for that job).
+  const rawIds: unknown[] = Array.isArray(req.body.jobIds) ? req.body.jobIds : jobId ? [jobId] : [];
+  const jobIds = [...new Set(rawIds.map((id) => String(id)).filter(Boolean))].slice(0, 20);
+  const navJobId =
+    req.body.navJobId != null ? String(req.body.navJobId) : Array.isArray(req.body.jobIds) ? undefined : jobId ? String(jobId) : undefined;
+
   if (lat == null || lng == null) {
     res.status(400).json({ error: 'Latitude and longitude are required' });
+    return;
+  }
+  if (jobIds.length > 0 && !driverId) {
+    res.status(401).json({ error: 'Driver not identified' });
     return;
   }
 
@@ -663,17 +674,30 @@ driverRouter.post('/location', async (req: Request, res: Response): Promise<void
       );
     }
 
-    if (jobId) {
-      await pool.query(
-        `UPDATE public.bookings SET driver_lat = $1, driver_lng = $2, driver_location_at = NOW(), updated_at = NOW() WHERE id = $3`,
-        [lat, lng, jobId]
+    if (jobIds.length > 0) {
+      // Only the driver's own bookings: the position is shown to those clients
+      const updated = await pool.query(
+        `UPDATE public.bookings
+         SET driver_lat = $1, driver_lng = $2, driver_location_at = NOW(), updated_at = NOW()
+         WHERE id::text = ANY($3::text[]) AND driver_id::text = $4
+         RETURNING id`,
+        [lat, lng, jobIds, String(driverId)]
       );
-      broadcastDriverLocation(jobId, Number(lat), Number(lng), {
+
+      const motion = {
         heading: heading != null && heading >= 0 && heading <= 360 ? heading : undefined,
         speed: speed != null && speed >= 0 ? speed : undefined,
-        etaS: etaS != null && etaS >= 0 ? etaS : undefined,
-        remainingM: remainingM != null && remainingM >= 0 ? remainingM : undefined,
-      });
+      };
+      for (const row of updated.rows) {
+        const id = String(row.id);
+        const isNavTarget = id === navJobId;
+        broadcastDriverLocation(id, Number(lat), Number(lng), {
+          ...motion,
+          // Time and distance left only describe the stop being navigated to
+          etaS: isNavTarget && etaS != null && etaS >= 0 ? etaS : undefined,
+          remainingM: isNavTarget && remainingM != null && remainingM >= 0 ? remainingM : undefined,
+        });
+      }
     }
 
     res.json({ success: true });
