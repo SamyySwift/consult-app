@@ -437,7 +437,7 @@ class _TrackingContentState extends State<_TrackingContent> {
             builder: (context, scrollController) => _DetailsSheet(
               scrollController: scrollController,
               children: [
-                _LiveProgressCard(
+                LiveProgressCard(
                   booking: booking,
                   route: route,
                   routeIndex: routeIndex,
@@ -788,6 +788,17 @@ Future<void> _callDriver(BuildContext context, String phone) async {
 
 /// Frosted chip over the map showing how fresh the driver's position is.
 /// Rebuilds on a timer so "updated X ago" stays current.
+/// After this long without an update the driver's position is no longer
+/// live: it's shown as "last seen" and not used for arrival estimates.
+const _locationStaleAfter = Duration(minutes: 2);
+
+String _formatAgo(Duration d) {
+  if (d.inSeconds < 60) return '${d.inSeconds.clamp(1, 59)}s ago';
+  if (d.inMinutes < 60) return '${d.inMinutes} min ago';
+  if (d.inHours < 24) return '${d.inHours} h ago';
+  return '${d.inDays} d ago';
+}
+
 class _FreshnessChip extends StatefulWidget {
   final DateTime at;
   const _FreshnessChip({required this.at});
@@ -797,8 +808,6 @@ class _FreshnessChip extends StatefulWidget {
 }
 
 class _FreshnessChipState extends State<_FreshnessChip> {
-  static const _staleAfter = Duration(minutes: 2);
-
   Timer? _ticker;
 
   @override
@@ -815,17 +824,10 @@ class _FreshnessChipState extends State<_FreshnessChip> {
     super.dispose();
   }
 
-  String _formatAgo(Duration d) {
-    if (d.inSeconds < 60) return '${d.inSeconds.clamp(1, 59)}s ago';
-    if (d.inMinutes < 60) return '${d.inMinutes} min ago';
-    if (d.inHours < 24) return '${d.inHours} h ago';
-    return '${d.inDays} d ago';
-  }
-
   @override
   Widget build(BuildContext context) {
     final age = DateTime.now().difference(widget.at);
-    final isStale = age > _staleAfter;
+    final isStale = age > _locationStaleAfter;
     final dot = isStale ? context.colors.warning : context.colors.success;
 
     return GlassPill(
@@ -869,22 +871,44 @@ class _FreshnessChipState extends State<_FreshnessChip> {
 
 /// Distance left and an arrival estimate: measured along the road once the
 /// vehicle is picked up and a route is available, otherwise a rough
-/// straight-line guess.
-class _LiveProgressCard extends StatelessWidget {
-  // Straight-line distance understates road distance; this is a typical detour factor.
-  static const _roadFactor = 1.3;
-  // Average truck speed including traffic and stops, for a rough estimate only.
-  static const _avgSpeedKmh = 45.0;
-  // How long the driver's navigation ETA stays trustworthy without an update
-  static const _navFreshFor = Duration(minutes: 2);
-
+/// straight-line guess. Once the driver's position is stale it gives no
+/// estimate and says how old the position is instead.
+@visibleForTesting
+class LiveProgressCard extends StatefulWidget {
   final BookingModel booking;
   final RoadRoute? route;
 
   /// Index of the route point nearest the driver, when [route] is known.
   final int? routeIndex;
 
-  const _LiveProgressCard({required this.booking, this.route, this.routeIndex});
+  const LiveProgressCard({super.key, required this.booking, this.route, this.routeIndex});
+
+  @override
+  State<LiveProgressCard> createState() => _LiveProgressCardState();
+}
+
+class _LiveProgressCardState extends State<LiveProgressCard> {
+  // Straight-line distance understates road distance; this is a typical detour factor.
+  static const _roadFactor = 1.3;
+  // Average truck speed including traffic and stops, for a rough estimate only.
+  static const _avgSpeedKmh = 45.0;
+
+  // Re-checks the position's age, since it goes stale without any update
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
 
   String _formatEta(double hours) {
     final minutes = (hours * 60).round();
@@ -896,6 +920,7 @@ class _LiveProgressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final booking = widget.booking;
     final lat = booking.driverLat;
     final lng = booking.driverLng;
 
@@ -915,8 +940,8 @@ class _LiveProgressCard extends StatelessWidget {
         booking.status == BookingStatusEnum.confirmed;
     final target = headingToPickup ? booking.pickup : booking.dropoff;
     final km = metersBetween(LatLng(lat, lng), LatLng(target.lat, target.lng)) / 1000;
-    final route = this.route;
-    final routeIndex = this.routeIndex;
+    final route = widget.route;
+    final routeIndex = widget.routeIndex;
     final onRoute = !headingToPickup && route != null && routeIndex != null;
     final roadKm = onRoute
         ? route.remainingFromM(routeIndex) / 1000
@@ -925,16 +950,25 @@ class _LiveProgressCard extends StatelessWidget {
         ? route.durationS * (roadKm * 1000 / route.distanceM) / 3600
         : roadKm / _avgSpeedKmh;
 
+    final at = booking.driverLocationAt;
+    final age = at == null ? null : DateTime.now().difference(at);
+    final live = age != null && age < _locationStaleAfter;
+    final stale = age != null && !live;
     // The driver's turn-by-turn navigation knows the real road distance and
     // traffic; use it while their position is fresh
-    final at = booking.driverLocationAt;
-    final navFresh = at != null && DateTime.now().difference(at) < _navFreshFor;
-    final navEtaS = navFresh ? booking.driverEtaS : null;
-    final navRemainingM = navFresh ? booking.driverRemainingM : null;
+    final navEtaS = live ? booking.driverEtaS : null;
+    final navRemainingM = live ? booking.driverRemainingM : null;
+    final roughDistance = roadKm < 10 ? roadKm.toStringAsFixed(1) : roadKm.round().toString();
 
     final String title;
     final String subtitle;
-    if (km < 0.3) {
+    if (stale) {
+      // An estimate from an old position would look current; say how old it is
+      title = km < 0.3
+          ? 'Driver was at the ${headingToPickup ? 'pickup point' : 'delivery address'}'
+          : 'About $roughDistance km ${headingToPickup ? 'to pickup' : 'to delivery'}';
+      subtitle = 'Based on where the driver was ${_formatAgo(age)}';
+    } else if (km < 0.3) {
       title = headingToPickup
           ? 'Driver is at the pickup point'
           : 'Driver is at the delivery address';
@@ -945,18 +979,15 @@ class _LiveProgressCard extends StatelessWidget {
       title = '$distance km ${headingToPickup ? 'to pickup' : 'to delivery'}';
       subtitle = 'Arrives in about ${_formatEta(navEtaS / 3600)} with current traffic';
     } else {
-      final distance = roadKm < 10
-          ? roadKm.toStringAsFixed(1)
-          : roadKm.round().toString();
       title =
-          'About $distance km ${headingToPickup ? 'to pickup' : 'to delivery'}';
+          'About $roughDistance km ${headingToPickup ? 'to pickup' : 'to delivery'}';
       subtitle = 'Estimated arrival in ${_formatEta(hours)}';
     }
 
     return _card(
       context,
-      icon: Icons.route_rounded,
-      highlighted: true,
+      icon: stale ? Icons.history_rounded : Icons.route_rounded,
+      highlighted: !stale,
       title: title,
       subtitle: subtitle,
     );
