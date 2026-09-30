@@ -118,7 +118,7 @@ class NavigationService {
       }
 
       await _ensureSession();
-      await _waitForFirstFix();
+      final located = await _waitForFirstFix();
 
       final status = await GoogleMapsNavigator.setDestinations(
         Destinations(
@@ -134,6 +134,16 @@ class NavigationService {
         ),
       );
       if (status != NavigationRouteStatus.statusOk) {
+        final noLocation = status == NavigationRouteStatus.locationUnavailable ||
+            status == NavigationRouteStatus.locationUnknown;
+        // The SDK never reported a single position: on iOS this is also what a
+        // key Google rejects looks like, since the plugin can't report it there
+        if (noLocation && !located) {
+          return const NavStartResult.failed(
+            'Navigation can\'t get your location. If this keeps happening, '
+            'navigation may not be set up for this app yet; use Google Maps for now.',
+          );
+        }
         return NavStartResult.failed(_routeStatusMessage(status));
       }
 
@@ -152,6 +162,23 @@ class NavigationService {
       _leg = leg;
       guiding.value = true;
       return const NavStartResult.ok();
+    } on SessionInitializationException catch (e) {
+      // Android reports these up front; iOS only logs a rejected key
+      debugPrint('Navigation session failed: ${e.code}');
+      switch (e.code) {
+        case SessionInitializationError.notAuthorized:
+          return const NavStartResult.failed(
+            'Navigation isn\'t set up for this app yet. Please contact support.',
+          );
+        case SessionInitializationError.locationPermissionMissing:
+          return const NavStartResult.failed(
+            'Allow location access for this app to use navigation.',
+          );
+        case SessionInitializationError.termsNotAccepted:
+          return const NavStartResult.failed(
+            'In-app navigation needs Google\'s terms to be accepted.',
+          );
+      }
     } catch (e) {
       debugPrint('Navigation start failed: $e');
       return const NavStartResult.failed('Navigation couldn\'t start. Please try again.');
@@ -217,10 +244,12 @@ class NavigationService {
   }
 
   /// Route calculation fails until the SDK has a location, so wait for one.
-  Future<void> _waitForFirstFix() async {
-    if (_lastLocation != null) return;
+  /// Returns false if none arrived in time.
+  Future<bool> _waitForFirstFix() async {
+    if (_lastLocation != null) return true;
     _firstFix ??= Completer<void>();
     await _firstFix!.future.timeout(_firstFixTimeout, onTimeout: () {});
+    return _lastLocation != null;
   }
 
   void _onLocation(RoadSnappedLocationUpdatedEvent event) {
