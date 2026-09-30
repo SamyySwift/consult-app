@@ -79,6 +79,7 @@ class NavigationService {
   Stream<NavLeg> get arrivals => _arrivals.stream;
 
   bool _listenersAttached = false;
+  StreamSubscription<RemainingTimeOrDistanceChangedEvent>? _progressSub;
   Completer<void>? _firstFix;
   LatLng? _lastLocation;
   DateTime? _lastLocationAt;
@@ -161,6 +162,13 @@ class NavigationService {
       await GoogleMapsNavigator.startGuidance();
       _leg = leg;
       guiding.value = true;
+      // The listener only reports changes, so show the starting figures now
+      try {
+        final now = await GoogleMapsNavigator.getCurrentTimeAndDistance();
+        progress.value = NavProgress(remainingS: now.time, remainingM: now.distance);
+      } catch (e) {
+        debugPrint('Initial time/distance unavailable: $e');
+      }
       return const NavStartResult.ok();
     } on SessionInitializationException catch (e) {
       // Android reports these up front; iOS only logs a rejected key
@@ -220,6 +228,17 @@ class NavigationService {
         resumeAppOnTap: true,
       ),
     );
+    // Must come after the session exists: the plugin applies the thresholds to
+    // the session's navigator, and creating a session resets them to "never"
+    await _progressSub?.cancel();
+    _progressSub = GoogleMapsNavigator.setOnRemainingTimeOrDistanceChangedListener(
+      (e) => progress.value = NavProgress(
+        remainingS: e.remainingTime,
+        remainingM: e.remainingDistance,
+      ),
+      remainingTimeThresholdSeconds: 10,
+      remainingDistanceThresholdMeters: 25,
+    );
     sessionReady.value = true;
   }
 
@@ -228,14 +247,6 @@ class NavigationService {
     _listenersAttached = true;
 
     await GoogleMapsNavigator.setRoadSnappedLocationUpdatedListener(_onLocation);
-    GoogleMapsNavigator.setOnRemainingTimeOrDistanceChangedListener(
-      (e) => progress.value = NavProgress(
-        remainingS: e.remainingTime,
-        remainingM: e.remainingDistance,
-      ),
-      remainingTimeThresholdSeconds: 10,
-      remainingDistanceThresholdMeters: 25,
-    );
     GoogleMapsNavigator.setOnArrivalListener((_) async {
       final arrivedLeg = _leg;
       await stop();
