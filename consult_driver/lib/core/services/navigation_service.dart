@@ -256,13 +256,16 @@ class NavigationService {
   Future<void> _ensureSession() async {
     if (sessionReady.value && await GoogleMapsNavigator.isInitialized()) return;
 
-    await _attachListeners();
     await GoogleMapsNavigator.initializeNavigationSession(
       notificationOptions: const NavigationNotificationOptions(
         defaultMessage: 'Carpital Consult delivery navigation',
         resumeAppOnTap: true,
       ),
     );
+    // Also after the session: on iOS the road-snapped provider belongs to the
+    // session, and subscribing before it exists never starts it, so no
+    // position arrives until guidance runs and routing fails without one
+    await _attachListeners();
     // Must come after the session exists: the plugin applies the thresholds to
     // the session's navigator, and creating a session resets them to "never"
     await _progressSub?.cancel();
