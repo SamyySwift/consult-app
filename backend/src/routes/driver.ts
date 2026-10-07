@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
+import { withoutBookingMedia } from '../bookingMedia';
+import { OPEN_BOOKING_STATUSES } from '../bookingScope';
 import { notifyBookingStatus } from '../services/bookingNotifications';
 import { sendOtpEmail } from '../services/email';
 import { uploadBufferOrBase64 } from './upload';
@@ -493,9 +495,14 @@ driverRouter.get('/jobs', async (req: Request, res: Response): Promise<void> => 
     if (driverId) {
       query += ` WHERE b.driver_id = $1`;
       params.push(driverId);
+      if (req.query.scope === 'open') {
+        query += ` AND b.status = ANY($2)`;
+        params.push(OPEN_BOOKING_STATUSES);
+      }
     } else {
       // If no driver specified, show active bookings
-      query += ` WHERE b.status IN ('pending', 'assigned', 'confirmed', 'pickedUp', 'picked_up', 'inTransit', 'in_transit')`;
+      query += ` WHERE b.status = ANY($1)`;
+      params.push(OPEN_BOOKING_STATUSES);
     }
 
     query += ` ORDER BY b.created_at DESC`;
@@ -506,7 +513,7 @@ driverRouter.get('/jobs', async (req: Request, res: Response): Promise<void> => 
     const jobs = result.rows.map(row => {
       const clientFullName = [row.client_first_name, row.client_last_name].filter(Boolean).join(' ') || 'Client';
       return {
-        ...row,
+        ...withoutBookingMedia(row),
         client_name: clientFullName,
         profiles: {
           full_name: clientFullName,

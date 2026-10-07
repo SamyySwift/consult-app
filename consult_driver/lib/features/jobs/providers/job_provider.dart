@@ -14,6 +14,10 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool _isLoading = false;
   bool _hasLoadedFromApi = false;
   Timer? _pollingTimer;
+  // Polls fetch only open jobs; the full list, history included, loads at
+  // start, when a job leaves the open set, and at least this often
+  static const _fullRefreshEvery = Duration(minutes: 5);
+  DateTime? _lastFullFetchAt;
   StreamSubscription<Position>? _positionStream;
   StreamSubscription<ServiceStatus>? _serviceStatusSub;
   bool _startingTracking = false;
@@ -85,28 +89,50 @@ class JobProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  Future<List<JobModel>?> _getJobs({required bool openOnly}) async {
+    final res = await ApiClient.instance.get(
+      openOnly ? '/api/driver/jobs?scope=open' : '/api/driver/jobs',
+    );
+    if (!res.isSuccess || res.data == null) return null;
+    return (res.data as List<dynamic>)
+        .map((item) => JobModel.fromSupabaseMap(item as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Start background polling every 5 seconds to sync live jobs
   void _startPolling() {
     _pollingTimer?.cancel();
     _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      fetchJobs(silent: true);
+      fetchJobs(silent: true, poll: true);
     });
   }
 
-  /// Fetch jobs from Railway API
-  Future<void> fetchJobs({bool silent = false}) async {
+  /// Fetch jobs from Railway API. A [poll] fetches only open jobs when the
+  /// full list is recent enough.
+  Future<void> fetchJobs({bool silent = false, bool poll = false}) async {
     if (!silent) {
       _isLoading = true;
       notifyListeners();
     }
 
     try {
-      final res = await ApiClient.instance.get('/api/driver/jobs');
-      if (res.isSuccess && res.data != null) {
-        final List<dynamic> data = res.data as List<dynamic>;
-        final List<JobModel> remoteJobs = data
-            .map((item) => JobModel.fromSupabaseMap(item as Map<String, dynamic>))
-            .toList();
+      final last = _lastFullFetchAt;
+      var full = !poll || last == null || DateTime.now().difference(last) >= _fullRefreshEvery;
+      var remoteJobs = await _getJobs(openOnly: !full);
+      if (remoteJobs != null && !full) {
+        final openIds = {for (final j in remoteJobs) j.id};
+        // A job that dropped out of the open set finished, was cancelled or
+        // was reassigned; only the full list says which
+        if (_allJobs.any((j) => j.isOpen && !openIds.contains(j.id))) {
+          full = true;
+          remoteJobs = await _getJobs(openOnly: false);
+        } else {
+          remoteJobs = [...remoteJobs, ..._allJobs.where((j) => !j.isOpen)]
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        }
+      }
+      if (remoteJobs != null) {
+        if (full) _lastFullFetchAt = DateTime.now();
         _allJobs = remoteJobs;
         _hasLoadedFromApi = true;
 

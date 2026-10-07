@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db';
+import { withoutBookingMedia } from '../bookingMedia';
 import { getInsurancePercentage } from '../settings';
 
 export const bookingsRouter = Router();
@@ -185,7 +186,8 @@ bookingsRouter.get('/', async (req: Request, res: Response): Promise<void> => {
     query += ` ORDER BY b.created_at DESC`;
 
     const result = await pool.query(query, params);
-    res.json(result.rows);
+    // The signature stays: the Handover POD shows it from this list
+    res.json(result.rows.map((row) => withoutBookingMedia(row, ['client_signature_url'])));
   } catch (err: any) {
     console.error('Error fetching bookings:', err);
     res.status(500).json({ error: 'Failed to fetch bookings' });

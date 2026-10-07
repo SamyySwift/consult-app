@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db';
+import { BOOKING_MEDIA_COLUMNS, withoutBookingMedia } from '../bookingMedia';
+import { OPEN_BOOKING_STATUSES } from '../bookingScope';
 import { notifyBookingStatus } from '../services/bookingNotifications';
 import { getInsurancePercentage, setInsurancePercentage } from '../settings';
 
@@ -8,7 +10,9 @@ export const adminRouter = Router();
 // -------------------------------------------------------------
 // GET /api/admin/bookings - List all bookings for admin command center
 // -------------------------------------------------------------
-adminRouter.get('/bookings', async (_req: Request, res: Response): Promise<void> => {
+adminRouter.get('/bookings', async (req: Request, res: Response): Promise<void> => {
+  const openOnly = req.query.scope === 'open';
+
   try {
     const result = await pool.query(`
       SELECT 
@@ -26,8 +30,9 @@ adminRouter.get('/bookings', async (_req: Request, res: Response): Promise<void>
       FROM public.bookings b
       LEFT JOIN public.users u ON b.user_id = u.id
       LEFT JOIN public.users d ON b.driver_id = d.id
+      ${openOnly ? 'WHERE b.status = ANY($1)' : ''}
       ORDER BY b.created_at DESC
-    `);
+    `, openOnly ? [OPEN_BOOKING_STATUSES] : []);
 
     // Format response to provide both direct joined columns and nested client/driver objects
     const formatted = result.rows.map(row => {
@@ -35,7 +40,7 @@ adminRouter.get('/bookings', async (_req: Request, res: Response): Promise<void>
       const driverFullName = [row.driver_first_name, row.driver_last_name].filter(Boolean).join(' ') || (row.driver_id ? 'Assigned Driver' : 'Unassigned');
 
       return {
-        ...row,
+        ...withoutBookingMedia(row),
         client: {
           full_name: clientFullName,
           email: row.client_email || '',
@@ -54,6 +59,28 @@ adminRouter.get('/bookings', async (_req: Request, res: Response): Promise<void>
   } catch (err: any) {
     console.error('Error fetching admin bookings:', err);
     res.status(500).json({ error: 'Failed to fetch bookings: ' + err.message });
+  }
+});
+
+// -------------------------------------------------------------
+// GET /api/admin/bookings/:id/media - Pickup photos, voice note and signature
+// for one booking, which the list leaves out
+// -------------------------------------------------------------
+adminRouter.get('/bookings/:id/media', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await pool.query(
+      `SELECT ${BOOKING_MEDIA_COLUMNS.join(', ')} FROM public.bookings
+       WHERE id::text = $1 OR booking_reference = $1`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Booking not found' });
+      return;
+    }
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    console.error('Error fetching booking media:', err);
+    res.status(500).json({ error: 'Failed to fetch booking media' });
   }
 });
 

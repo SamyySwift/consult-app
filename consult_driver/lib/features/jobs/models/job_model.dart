@@ -283,6 +283,9 @@ class JobModel {
     }
   }
 
+  /// Not finished or cancelled; the backend's open scope returns these.
+  bool get isOpen => status != JobStatus.completed && status != JobStatus.cancelled;
+
   bool get isActive =>
       status == JobStatus.confirmed ||
       status == JobStatus.pickedUp ||

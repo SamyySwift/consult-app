@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { fetchAdminBookings, fetchAdminDrivers } from '../lib/api';
 
 const AppContext = createContext();
@@ -55,70 +55,92 @@ export function AppProvider({ children }) {
     }
   };
 
-  const fetchBookings = async () => {
-    try {
-      const data = await fetchAdminBookings();
+  const formatBooking = (b) => {
+    const clientName = b.client?.full_name || [b.client_first_name, b.client_last_name].filter(Boolean).join(' ') || 'Direct Client';
+    const clientPhone = b.client?.phone || b.client_phone || '—';
+    const driverName = b.driver?.full_name || [b.driver_first_name, b.driver_last_name].filter(Boolean).join(' ') || (b.driver_id ? 'Assigned Driver' : 'Unassigned');
+    
+    return {
+      id: b.id || b.booking_reference || 'JB00000',
+      dbId: b.id,
+      bookingReference: b.booking_reference,
+      customerId: b.user_id,
+      customerName: clientName,
+      customerPhone: clientPhone,
+      driverId: b.driver_id,
+      driverName: driverName,
+      driverPhone: b.driver_phone || null,
+      // Last position the driver app reported for this job
+      driverLocation: toNumber(b.driver_lat) != null && toNumber(b.driver_lng) != null
+        ? { lat: toNumber(b.driver_lat), lng: toNumber(b.driver_lng), at: b.driver_location_at || null }
+        : null,
+      vehicle: {
+        type: (b.vehicle_type || 'sedan').toLowerCase(),
+        make: b.vehicle_make || 'Vehicle',
+        model: b.vehicle_model || '',
+        year: b.vehicle_year || '2023',
+        color: b.vehicle_color || 'Silver',
+      },
+      pickup: {
+        address: b.pickup_address || 'Lagos, Nigeria',
+        scheduledAt: b.pickup_datetime ? formatRelativeTime(b.pickup_datetime) : 'Scheduled',
+        lat: toNumber(b.pickup_lat),
+        lng: toNumber(b.pickup_lng),
+      },
+      dropoff: {
+        address: b.dropoff_address || 'Abuja, Nigeria',
+        lat: toNumber(b.dropoff_lat),
+        lng: toNumber(b.dropoff_lng),
+      },
+      serviceType: b.service_type || 'Standard',
+      transportMode: b.transport_mode ? (b.transport_mode.includes('enclosed') ? 'Enclosed Transport' : 'Open Transport') : 'Open Transport',
+      hasInsurance: !!b.has_insurance,
+      vehicleValue: Number(b.vehicle_value) || 0,
+      insuranceFee: Number(b.insurance_fee) || Number(b.insurance_amount) || 0,
+      totalAmount: Number(b.total_amount) || 75000,
+      status: normalizeStatus(b.status),
+      createdAt: formatRelativeTime(b.created_at),
+      createdAtRaw: b.created_at,
+      assignedAt: b.assigned_at ? formatRelativeTime(b.assigned_at) : (b.driver_id ? formatRelativeTime(b.created_at) : null),
+      confirmedAt: b.confirmed_at ? formatRelativeTime(b.confirmed_at) : null,
+      pickedUpAt: b.picked_up_at ? formatRelativeTime(b.picked_up_at) : null,
+      completedAt: b.completed_at ? formatRelativeTime(b.completed_at) : null,
+      clientAcknowledgedAt: b.client_acknowledged_at ? formatRelativeTime(b.client_acknowledged_at) : null,
+      // Photos, voice note and signature load when the booking is opened
+      pickupConditionDesc: b.pickup_condition_desc,
+    };
+  };
 
-      if (data) {
-        const formattedJobs = data.map(b => {
-          const clientName = b.client?.full_name || [b.client_first_name, b.client_last_name].filter(Boolean).join(' ') || 'Direct Client';
-          const clientPhone = b.client?.phone || b.client_phone || '—';
-          const driverName = b.driver?.full_name || [b.driver_first_name, b.driver_last_name].filter(Boolean).join(' ') || (b.driver_id ? 'Assigned Driver' : 'Unassigned');
-          
-          return {
-            id: b.id || b.booking_reference || 'JB00000',
-            dbId: b.id,
-            bookingReference: b.booking_reference,
-            customerId: b.user_id,
-            customerName: clientName,
-            customerPhone: clientPhone,
-            driverId: b.driver_id,
-            driverName: driverName,
-            driverPhone: b.driver_phone || null,
-            // Last position the driver app reported for this job
-            driverLocation: toNumber(b.driver_lat) != null && toNumber(b.driver_lng) != null
-              ? { lat: toNumber(b.driver_lat), lng: toNumber(b.driver_lng), at: b.driver_location_at || null }
-              : null,
-            vehicle: {
-              type: (b.vehicle_type || 'sedan').toLowerCase(),
-              make: b.vehicle_make || 'Vehicle',
-              model: b.vehicle_model || '',
-              year: b.vehicle_year || '2023',
-              color: b.vehicle_color || 'Silver',
-            },
-            pickup: {
-              address: b.pickup_address || 'Lagos, Nigeria',
-              scheduledAt: b.pickup_datetime ? formatRelativeTime(b.pickup_datetime) : 'Scheduled',
-              lat: toNumber(b.pickup_lat),
-              lng: toNumber(b.pickup_lng),
-            },
-            dropoff: {
-              address: b.dropoff_address || 'Abuja, Nigeria',
-              lat: toNumber(b.dropoff_lat),
-              lng: toNumber(b.dropoff_lng),
-            },
-            serviceType: b.service_type || 'Standard',
-            transportMode: b.transport_mode ? (b.transport_mode.includes('enclosed') ? 'Enclosed Transport' : 'Open Transport') : 'Open Transport',
-            hasInsurance: !!b.has_insurance,
-            vehicleValue: Number(b.vehicle_value) || 0,
-            insuranceFee: Number(b.insurance_fee) || Number(b.insurance_amount) || 0,
-            totalAmount: Number(b.total_amount) || 75000,
-            status: normalizeStatus(b.status),
-            createdAt: formatRelativeTime(b.created_at),
-            createdAtRaw: b.created_at,
-            assignedAt: b.assigned_at ? formatRelativeTime(b.assigned_at) : (b.driver_id ? formatRelativeTime(b.created_at) : null),
-            confirmedAt: b.confirmed_at ? formatRelativeTime(b.confirmed_at) : null,
-            pickedUpAt: b.picked_up_at ? formatRelativeTime(b.picked_up_at) : null,
-            completedAt: b.completed_at ? formatRelativeTime(b.completed_at) : null,
-            clientAcknowledgedAt: b.client_acknowledged_at ? formatRelativeTime(b.client_acknowledged_at) : null,
-            clientSignatureBase64: b.client_signature_url 
-              ? (b.client_signature_url.startsWith('data:image') ? b.client_signature_url : `data:image/png;base64,${b.client_signature_url}`) 
-              : null,
-            pickupConditionDesc: b.pickup_condition_desc,
-            pickupConditionImages: Array.isArray(b.pickup_condition_images) ? b.pickup_condition_images : null,
-            pickupConditionAudio: b.pickup_condition_audio,
-          };
-        });
+  const isOpenStatus = (status) => status !== 'completed' && status !== 'cancelled';
+
+  // Polls fetch only open bookings; the full list, history included, loads at
+  // start, when a booking leaves the open set, and at least this often
+  const FULL_REFRESH_MS = 60_000;
+  const lastFullFetchAt = useRef(0);
+  // The interval below would otherwise only ever see the first render's jobs
+  const jobsRef = useRef([]);
+
+  const fetchBookings = async ({ poll = false } = {}) => {
+    try {
+      let full = !poll || Date.now() - lastFullFetchAt.current >= FULL_REFRESH_MS;
+      let formattedJobs = (await fetchAdminBookings({ openOnly: !full }))?.map(formatBooking);
+
+      if (formattedJobs && !full) {
+        const openIds = new Set(formattedJobs.map(j => j.id));
+        // A booking that dropped out of the open set was completed or
+        // cancelled; only the full list says which
+        if (jobsRef.current.some(j => isOpenStatus(j.status) && !openIds.has(j.id))) {
+          full = true;
+          formattedJobs = (await fetchAdminBookings())?.map(formatBooking);
+        } else {
+          formattedJobs = [...formattedJobs, ...jobsRef.current.filter(j => !isOpenStatus(j.status))]
+            .sort((a, b) => new Date(b.createdAtRaw) - new Date(a.createdAtRaw));
+        }
+      }
+
+      if (formattedJobs) {
+        if (full) lastFullFetchAt.current = Date.now();
+        jobsRef.current = formattedJobs;
         setJobs(formattedJobs);
         setLiveStatus('live');
       }
@@ -134,13 +156,20 @@ export function AppProvider({ children }) {
     fetchDrivers();
     fetchBookings();
 
-    // Auto-refresh poll every 4 seconds for live command center updates
-    const interval = setInterval(() => {
+    // Auto-refresh poll every 4 seconds for live command center updates. A
+    // hidden tab skips it and catches up as soon as it's shown again.
+    const poll = () => {
+      if (document.hidden) return;
       fetchDrivers();
-      fetchBookings();
-    }, 4000);
+      fetchBookings({ poll: true });
+    };
+    const interval = setInterval(poll, 4000);
+    document.addEventListener('visibilitychange', poll);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', poll);
+    };
   }, []);
 
   const value = {

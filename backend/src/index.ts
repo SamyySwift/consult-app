@@ -1,6 +1,7 @@
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import { initDatabase, pool } from './db';
 import { attachRealtime } from './realtime';
@@ -18,6 +19,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+// JSON shrinks 5-10x, and egress is billed per GB
+app.use(compression());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 

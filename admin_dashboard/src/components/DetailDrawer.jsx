@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   BadgeCheck,
   Banknote,
@@ -23,7 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
-import { assignDriver, updateBookingStatus } from '../lib/api';
+import { assignDriver, fetchBookingMedia, updateBookingStatus } from '../lib/api';
 import { formatNaira, shortRef, vehicleName } from '../lib/format';
 import { ACTIVE } from '../lib/status';
 import {
@@ -118,7 +118,20 @@ function Timeline({ job }) {
 
 export function DetailDrawer() {
   const { jobs, drivers, selectedJobId, setSelectedJobId, fetchBookings } = useAppContext();
-  const job = jobs.find(j => j.id === selectedJobId);
+  const listed = jobs.find(j => j.id === selectedJobId);
+
+  // Media arrive at pickup and sign-off, so reload them when the status moves
+  const [media, setMedia] = useState(null);
+  useEffect(() => {
+    if (!selectedJobId) return;
+    let cancelled = false;
+    fetchBookingMedia(selectedJobId)
+      .then(m => { if (!cancelled) setMedia({ id: selectedJobId, ...m }); })
+      .catch(err => console.error('Error fetching booking media:', err));
+    return () => { cancelled = true; };
+  }, [selectedJobId, listed?.status]);
+
+  const job = listed && media?.id === listed.id ? { ...listed, ...media } : listed;
 
   const isOpen = !!job;
 

@@ -1,13 +1,33 @@
 // Carpital Consult Admin API Client
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://carpitalconsult.com';
 
-export async function fetchAdminBookings() {
-  const res = await fetch(`${API_BASE_URL}/api/admin/bookings`);
+// openOnly skips completed and cancelled bookings, for frequent polls
+export async function fetchAdminBookings({ openOnly = false } = {}) {
+  const res = await fetch(`${API_BASE_URL}/api/admin/bookings${openOnly ? '?scope=open' : ''}`);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Failed to fetch bookings (${res.status})`);
   }
   return res.json();
+}
+
+// Pickup photos, voice note and signature for one booking; the bookings list
+// leaves them out because they're most of its size
+export async function fetchBookingMedia(bookingId) {
+  const res = await fetch(`${API_BASE_URL}/api/admin/bookings/${bookingId}/media`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch booking media (${res.status})`);
+  }
+  const m = await res.json();
+  const signature = m.client_signature_url;
+  return {
+    clientSignatureBase64: signature
+      ? (signature.startsWith('data:image') ? signature : `data:image/png;base64,${signature}`)
+      : null,
+    pickupConditionImages: Array.isArray(m.pickup_condition_images) ? m.pickup_condition_images : null,
+    pickupConditionAudio: m.pickup_condition_audio,
+  };
 }
 
 export async function fetchAdminDrivers() {
