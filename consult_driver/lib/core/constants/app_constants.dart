@@ -20,7 +20,7 @@ class AppRoutes {
 }
 
 class AppConstants {
-  static const String appName = 'Carpital Consult Driver';
+  static const String appName = 'Full Speed Driver';
   static const String appVersion = '1.0.0';
 
   // TODO: confirm this placeholder address before release (same as client).

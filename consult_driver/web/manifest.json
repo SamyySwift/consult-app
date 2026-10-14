@@ -1,6 +1,6 @@
 {
-    "name": "automove_driver",
-    "short_name": "automove_driver",
+    "name": "Full Speed Driver",
+    "short_name": "Full Speed Driver",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

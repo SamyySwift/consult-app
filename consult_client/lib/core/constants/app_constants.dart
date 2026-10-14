@@ -4,7 +4,7 @@ class AppConstants {
   AppConstants._();
 
   // App Info
-  static const String appName = 'Carpital Consult';
+  static const String appName = 'Full Speed Logistics';
   static const String appTagline = 'Your vehicle, safely delivered.';
   static const String appVersion = '1.0.0';
 
