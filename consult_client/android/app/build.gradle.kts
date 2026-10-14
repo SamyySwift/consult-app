@@ -13,7 +13,7 @@ plugins {
 }
 
 android {
-    namespace = "com.carpitalconsult.consultlogistics"
+    namespace = "com.fullspeedlogistics.client"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -25,7 +25,7 @@ android {
     defaultConfig {
         // Matches the iOS bundle ID. Google Maps API keys are restricted to it,
         // so changing it means updating the key restrictions too.
-        applicationId = "com.carpitalconsult.consultlogistics"
+        applicationId = "com.fullspeedlogistics.client"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

@@ -8,8 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:automove_driver/core/services/navigation_service.dart';
-import 'package:automove_driver/features/jobs/providers/job_provider.dart';
+import 'package:fullspeed_driver/core/services/navigation_service.dart';
+import 'package:fullspeed_driver/features/jobs/providers/job_provider.dart';
 
 class FakeGeolocator extends GeolocatorPlatform {
   final positions = StreamController<Position>.broadcast();

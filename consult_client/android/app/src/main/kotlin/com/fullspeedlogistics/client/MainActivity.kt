@@ -1,4 +1,4 @@
-package com.carpitalconsult.consultlogistics
+package com.fullspeedlogistics.client
 
 import io.flutter.embedding.android.FlutterActivity
 

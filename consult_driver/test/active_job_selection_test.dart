@@ -16,8 +16,8 @@ import 'package:google_navigation_flutter/src/method_channel/method_channel.dart
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
-import 'package:automove_driver/features/jobs/providers/job_provider.dart';
-import 'package:automove_driver/features/jobs/screens/active_job_screen.dart';
+import 'package:fullspeed_driver/features/jobs/providers/job_provider.dart';
+import 'package:fullspeed_driver/features/jobs/screens/active_job_screen.dart';
 
 /// Stands in for Google's native map, which can't render in widget tests.
 class FakeNavigationPlatform extends GoogleMapsNavigationPlatform {

@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:automove_driver/features/auth/providers/auth_provider.dart';
-import 'package:automove_driver/features/auth/screens/complete_profile_screen.dart';
-import 'package:automove_driver/core/widgets/driver_button.dart';
+import 'package:fullspeed_driver/features/auth/providers/auth_provider.dart';
+import 'package:fullspeed_driver/features/auth/screens/complete_profile_screen.dart';
+import 'package:fullspeed_driver/core/widgets/driver_button.dart';
 
 void main() {
   setUp(() {

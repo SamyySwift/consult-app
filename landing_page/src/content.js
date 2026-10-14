@@ -14,12 +14,12 @@ export const stores = {
   client: {
     name: 'Carpital Consult',
     appStore: null, // TODO: e.g. https://apps.apple.com/app/id0000000000
-    playStore: 'https://play.google.com/store/apps/details?id=com.carpitalconsult.consultlogistics',
+    playStore: 'https://play.google.com/store/apps/details?id=com.fullspeedlogistics.client',
   },
   driver: {
     name: 'Carpital Driver',
     appStore: null, // TODO: add once the driver app is on the App Store
-    playStore: 'https://play.google.com/store/apps/details?id=com.automove.automove_driver',
+    playStore: 'https://play.google.com/store/apps/details?id=com.fullspeedlogistics.driver',
   },
 }
 

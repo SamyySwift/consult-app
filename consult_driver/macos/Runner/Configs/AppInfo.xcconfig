@@ -5,10 +5,10 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = automove_driver
+PRODUCT_NAME = fullspeed_driver
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.automove.automoveDriver
+PRODUCT_BUNDLE_IDENTIFIER = com.fullspeedlogistics.driver
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.automove. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 com.fullspeedlogistics. All rights reserved.

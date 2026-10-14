@@ -3,8 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:automove_driver/features/auth/providers/auth_provider.dart';
-import 'package:automove_driver/features/profile/screens/profile_screen.dart';
+import 'package:fullspeed_driver/features/auth/providers/auth_provider.dart';
+import 'package:fullspeed_driver/features/profile/screens/profile_screen.dart';
 
 void main() {
   setUp(() {

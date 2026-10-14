@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:automove_driver/core/theme/driver_colors.dart';
-import 'package:automove_driver/core/utils/motion.dart';
-import 'package:automove_driver/core/widgets/surface.dart';
-import 'package:automove_driver/core/widgets/tap_target.dart';
+import 'package:fullspeed_driver/core/theme/driver_colors.dart';
+import 'package:fullspeed_driver/core/utils/motion.dart';
+import 'package:fullspeed_driver/core/widgets/surface.dart';
+import 'package:fullspeed_driver/core/widgets/tap_target.dart';
 
 void main() {
   group('TapTarget', () {

@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.automove" "\0"
-            VALUE "FileDescription", "automove_driver" "\0"
+            VALUE "CompanyName", "com.fullspeedlogistics" "\0"
+            VALUE "FileDescription", "fullspeed_driver" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "automove_driver" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.automove. All rights reserved." "\0"
-            VALUE "OriginalFilename", "automove_driver.exe" "\0"
-            VALUE "ProductName", "automove_driver" "\0"
+            VALUE "InternalName", "fullspeed_driver" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.fullspeedlogistics. All rights reserved." "\0"
+            VALUE "OriginalFilename", "fullspeed_driver.exe" "\0"
+            VALUE "ProductName", "fullspeed_driver" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

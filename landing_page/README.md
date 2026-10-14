@@ -15,7 +15,7 @@ Copy, prices, store links, FAQ, cities and sample trips all live in [`src/conten
 Before launch:
 
 - **App Store links** — `stores.client.appStore` and `stores.driver.appStore` are `null`, so those badges show "Coming soon". Add the URLs once the apps are live.
-- **Play Store links** — built from the app IDs in the Flutter projects (`com.carpitalconsult.consultlogistics`, `com.automove.automove_driver`). Check they resolve after publishing.
+- **Play Store links** — built from the app IDs in the Flutter projects (`com.fullspeedlogistics.client`, `com.fullspeedlogistics.driver`). Check they resolve after publishing.
 - **Prices** — mirror the defaults in `consult_client`. The live values sit in the `pricing_config` table, so keep the two in step.
 - **Terms / privacy URLs** — carried over from the client app, where they are still marked as placeholders.
 

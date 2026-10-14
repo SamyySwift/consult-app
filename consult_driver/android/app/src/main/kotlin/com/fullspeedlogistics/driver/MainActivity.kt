@@ -1,4 +1,4 @@
-package com.automove.automove_driver
+package com.fullspeedlogistics.driver
 
 import io.flutter.embedding.android.FlutterActivity
 
