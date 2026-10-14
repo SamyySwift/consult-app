@@ -61,6 +61,7 @@ class AuthSheetLayout extends StatelessWidget {
                         height: screen.height * heroHeight,
                         child: Image.network(
                           AppConstants.heroImageUrl,
+                          cacheWidth: 1200,
                           fit: BoxFit.cover,
                           alignment: const Alignment(0.15, 0),
                           errorBuilder: (_, _, _) => const SizedBox.shrink(),

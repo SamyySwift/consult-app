@@ -235,6 +235,9 @@ class _DocumentTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           child: Image.file(
             File(path),
+            // Decode to thumbnail size: the source is a full-resolution camera
+            // photo, which costs ~48MB decoded against a tile this small.
+            cacheWidth: 600,
             width: double.infinity,
             height: double.infinity,
             fit: BoxFit.cover,

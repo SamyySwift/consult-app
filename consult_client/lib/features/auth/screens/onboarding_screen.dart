@@ -38,23 +38,25 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     ];
 
     for (final src in sources) {
+      VideoPlayerController? candidate;
       try {
         if (src.startsWith('http') || kIsWeb) {
-          _videoController = VideoPlayerController.networkUrl(
+          candidate = VideoPlayerController.networkUrl(
             Uri.parse(src),
             videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
           );
         } else {
-          _videoController = VideoPlayerController.asset(
+          candidate = VideoPlayerController.asset(
             src,
             videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
           );
         }
 
-        await _videoController.initialize();
-        await _videoController.setLooping(true);
-        await _videoController.setVolume(0.0); // Completely silent
-        await _videoController.play();
+        await candidate.initialize();
+        await candidate.setLooping(true);
+        await candidate.setVolume(0.0); // Completely silent
+        await candidate.play();
+        _videoController = candidate;
 
         if (mounted) {
           setState(() {
@@ -63,6 +65,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         }
         return;
       } catch (e) {
+        // A controller that failed to initialise still holds a native player,
+        // so each skipped source would otherwise leak one for the whole session.
+        await candidate?.dispose();
         debugPrint('Video source ($src) initialization note: $e');
       }
     }

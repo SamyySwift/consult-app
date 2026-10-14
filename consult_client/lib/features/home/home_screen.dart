@@ -338,6 +338,7 @@ class _HeroBackdrop extends StatelessWidget {
           // own pixels; multiply also paints transparent areas.
           child: Image.network(
             AppConstants.heroImageUrl,
+            cacheWidth: 1200,
             fit: BoxFit.cover,
             alignment: Alignment(0.15, 0),
             color: Color(0xFF6E9C86),
@@ -816,6 +817,7 @@ class _PromoBanner extends StatelessWidget {
             children: [
               Image.network(
                 AppConstants.heroImageUrl,
+                cacheWidth: 900,
                 fit: BoxFit.cover,
                 alignment: Alignment(0.4, 0),
                 errorBuilder: (_, _, _) => const SizedBox.shrink(),
