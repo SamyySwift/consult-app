@@ -49,7 +49,7 @@ export default function HowItWorks() {
           </ol>
           <div className="relative">
             <div className="sticky top-0 flex h-screen items-center justify-center">
-              <div className="absolute h-[520px] w-[520px] rounded-full bg-[radial-gradient(closest-side,rgb(0_200_83/0.16),transparent)]" />
+              <div className="absolute h-[520px] w-[520px] rounded-full bg-[radial-gradient(closest-side,rgb(253_91_32/0.18),transparent)]" />
               <Phone screen={steps[active].id} label={screenLabels[steps[active].id]} />
             </div>
           </div>

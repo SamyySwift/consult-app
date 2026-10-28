@@ -1,4 +1,5 @@
 import { Mail } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { company } from '../content.js'
 
 const columns = [
@@ -25,8 +26,8 @@ const columns = [
     links: [
       ['FAQ', '#faq'],
       ['Contact support', `mailto:${company.email}`],
-      ['Terms of service', company.termsUrl],
-      ['Privacy policy', company.privacyUrl],
+      ['Terms of service', company.termsUrl, true],
+      ['Privacy policy', company.privacyUrl, true],
     ],
   },
 ]
@@ -51,18 +52,27 @@ export default function Footer() {
 
         <div className="mt-14 grid gap-10 border-b border-hairline pb-10 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr]">
           <div>
-            <img src="/images/logo_white.png" alt={company.name} width="583" height="241" className="h-7 w-auto invert" />
+            <div className="flex items-center gap-2.5">
+              <img src="/images/logo.jpeg" alt={company.name} className="h-7 w-7 rounded-lg object-cover shadow-xs" />
+              <span className="text-[1.0625rem] font-bold tracking-tight text-ink">{company.name}</span>
+            </div>
             <p className="mt-4 max-w-xs text-[0.875rem]">{company.tagline} Door-to-door vehicle logistics across Nigeria.</p>
           </div>
           {columns.map((col) => (
             <nav key={col.title} aria-label={col.title}>
               <p className="text-[0.8125rem] font-semibold text-ink">{col.title}</p>
               <ul className="mt-3 space-y-2.5">
-                {col.links.map(([label, href]) => (
+                {col.links.map(([label, href, isInternal]) => (
                   <li key={label}>
-                    <a href={href} className="text-[0.8125rem] hover:text-ink hover:underline">
-                      {label}
-                    </a>
+                    {isInternal ? (
+                      <Link to={href} className="text-[0.8125rem] hover:text-ink hover:underline">
+                        {label}
+                      </Link>
+                    ) : (
+                      <a href={href} className="text-[0.8125rem] hover:text-ink hover:underline">
+                        {label}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>

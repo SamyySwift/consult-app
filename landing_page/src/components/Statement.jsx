@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react'
 
-// `*word*` is lit in brand green.
+// `*word*` is lit in brand orange.
 const TEXT =
   'Moving a car across Nigeria used to mean phone calls, guesswork and crossed fingers. Now it takes *a few taps.* A verified driver collects it, you *watch every kilometre,* and the keys come back with a signature.'
 
@@ -24,7 +24,7 @@ export default function Statement() {
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start 0.85', 'end 0.45'] })
 
   return (
-    <section aria-label="Why Carpital Consult" className="bg-night py-32 text-snow md:py-48">
+    <section aria-label="Why Full Speed Logistics" className="bg-night py-32 text-snow md:py-48">
       <div className="shell">
         <p ref={ref} className="headline mx-auto max-w-[56rem] leading-[1.18]! md:text-[3.25rem]!">
           {words.map(({ word, accent }, i) => {

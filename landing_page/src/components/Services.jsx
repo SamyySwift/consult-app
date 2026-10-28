@@ -247,7 +247,7 @@ function CarrierArt({ enclosed }) {
         animate={{ opacity: enclosed ? 1 : 0 }}
         transition={spring}
       >
-        carpital
+        fullspeed
       </motion.text>
 
       {/* wheels */}

@@ -3,7 +3,7 @@ import { motion, useReducedMotion, useTransform } from 'motion/react'
 import { MAP_HEIGHT, MAP_WIDTH, OUTLINE, STATES, project } from '../data/nigeria.js'
 import { cities, routes } from '../content.js'
 
-const GREEN = '#00c853'
+const BRAND = '#fd5b20'
 
 /** A gentle arc between two cities, bowing to the left of travel. */
 function arc(fromKey, toKey) {
@@ -46,7 +46,7 @@ export default function NigeriaMap({ trip, progress }) {
         viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
         className="h-auto w-full"
         role="img"
-        aria-label={`Map of Nigeria showing Carpital's delivery network, with a live trip from ${cities[trip.from].name} to ${cities[trip.to].name}`}
+        aria-label={`Map of Nigeria showing Full Speed's delivery network, with a live trip from ${cities[trip.from].name} to ${cities[trip.to].name}`}
         onPointerLeave={() => setHovered(null)}
       >
         <defs>
@@ -81,7 +81,7 @@ export default function NigeriaMap({ trip, progress }) {
               key={r.id}
               d={r.d}
               fill="none"
-              stroke={GREEN}
+              stroke={BRAND}
               strokeOpacity="0.28"
               strokeWidth="1.5"
               strokeLinecap="round"
@@ -95,8 +95,8 @@ export default function NigeriaMap({ trip, progress }) {
 
           {/* Active trip: the route lights up behind the vehicle */}
           <path ref={activePath} d={tripPath} fill="none" stroke="none" />
-          <motion.path d={tripPath} fill="none" stroke={GREEN} strokeWidth="8" strokeLinecap="round" filter="url(#glow)" opacity="0.55" style={{ pathLength: progress }} />
-          <motion.path d={tripPath} fill="none" stroke={GREEN} strokeWidth="3" strokeLinecap="round" style={{ pathLength: progress }} />
+          <motion.path d={tripPath} fill="none" stroke={BRAND} strokeWidth="8" strokeLinecap="round" filter="url(#glow)" opacity="0.55" style={{ pathLength: progress }} />
+          <motion.path d={tripPath} fill="none" stroke={BRAND} strokeWidth="3" strokeLinecap="round" style={{ pathLength: progress }} />
           <path d={tripPath} fill="none" stroke="#f5f5f7" strokeOpacity="0.35" strokeWidth="1.5" strokeDasharray="2 8" strokeLinecap="round" />
 
           {Object.entries(cities).map(([key, c]) => {
@@ -104,8 +104,8 @@ export default function NigeriaMap({ trip, progress }) {
             const isEnd = key === trip.from || key === trip.to
             return (
               <g key={key} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`}>
-                {isEnd && <circle r="16" fill={GREEN} opacity="0.18" />}
-                <circle r={isEnd ? 6.5 : 4.5} fill={isEnd ? GREEN : '#f5f5f7'} stroke="#0d0d0e" strokeWidth="2" />
+                {isEnd && <circle r="16" fill={BRAND} opacity="0.18" />}
+                <circle r={isEnd ? 6.5 : 4.5} fill={isEnd ? BRAND : '#f5f5f7'} stroke="#0d0d0e" strokeWidth="2" />
                 <text
                   x="12"
                   y="6"
@@ -123,8 +123,8 @@ export default function NigeriaMap({ trip, progress }) {
           })}
 
           <motion.g style={{ x: vx, y: vy }}>
-            <circle r="18" fill={GREEN} opacity="0.22" />
-            <circle r="8" fill="#fff" stroke={GREEN} strokeWidth="4" />
+            <circle r="18" fill={BRAND} opacity="0.22" />
+            <circle r="8" fill="#fff" stroke={BRAND} strokeWidth="4" />
           </motion.g>
         </g>
       </svg>

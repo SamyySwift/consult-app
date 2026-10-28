@@ -334,11 +334,11 @@ function LiveVisual() {
             <path d="M70 -10 L96 210" />
             <path d="M230 -10 C220 80 250 150 240 210" />
           </g>
-          <path id="live-route" d="M40 180 C60 130 90 120 150 128 S230 90 250 30" fill="none" stroke="#00c853" strokeWidth="9" opacity="0.18" strokeLinecap="round" />
+          <path id="live-route" d="M40 180 C60 130 90 120 150 128 S230 90 250 30" fill="none" stroke="#fd5b20" strokeWidth="9" opacity="0.18" strokeLinecap="round" />
           <motion.path
             d="M40 180 C60 130 90 120 150 128 S230 90 250 30"
             fill="none"
-            stroke="#00c853"
+            stroke="#fd5b20"
             strokeWidth="3.5"
             strokeLinecap="round"
             initial={{ pathLength: 0 }}
@@ -346,8 +346,8 @@ function LiveVisual() {
             viewport={{ once: true }}
             transition={{ duration: 2, ease: [0.28, 0.11, 0.32, 1] }}
           />
-          <circle cx="40" cy="180" r="6" fill="#fff" stroke="#00c853" strokeWidth="3" />
-          <circle cx="250" cy="30" r="6" fill="#00c853" />
+          <circle cx="40" cy="180" r="6" fill="#fff" stroke="#fd5b20" strokeWidth="3" />
+          <circle cx="250" cy="30" r="6" fill="#fd5b20" />
         </svg>
         <p className="flex items-center justify-between px-1.5 pb-0.5 pt-2.5 text-[0.875rem]">
           <span className="font-semibold">Arrives in about 1 hr 25 min</span>

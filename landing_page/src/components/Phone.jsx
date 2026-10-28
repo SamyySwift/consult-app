@@ -2,14 +2,14 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Camera, Car, Check, ChevronLeft, CreditCard, Headphones, Lock, MapPin, Mic, Navigation, Phone as PhoneIcon, Plus, Star, Zap } from 'lucide-react'
 import { spring } from '../lib/motion.js'
 
-// Screens recreate the Carpital apps' dark UI: true black, charcoal cards, vivid green.
+// Screens recreate the Full Speed apps' dark UI: true black, charcoal cards, vivid orange.
 const ui = {
   bg: '#000',
   card: '#151515',
   card2: '#1e1e1e',
   line: '#2a2a2a',
   dim: '#9e9e9e',
-  green: '#00c853',
+  green: '#fd5b20',
 }
 
 /** An iPhone-proportioned frame at a fixed 300×640 design size. */
@@ -113,7 +113,7 @@ function BookScreen() {
               key={name}
               className="flex items-center gap-3 rounded-2xl px-3 py-2.5"
               style={{
-                background: selected ? 'rgb(0 200 83 / 0.1)' : ui.card,
+                background: selected ? 'rgb(253 91 32 / 0.12)' : ui.card,
                 boxShadow: `inset 0 0 0 1px ${selected ? ui.green : ui.line}`,
               }}
             >
@@ -143,7 +143,7 @@ function BookScreen() {
             <div
               key={t}
               className="rounded-2xl px-3 py-2.5 text-[12px] font-semibold"
-              style={{ background: i === 0 ? 'rgb(0 200 83 / 0.1)' : ui.card, boxShadow: `inset 0 0 0 1px ${i === 0 ? ui.green : ui.line}` }}
+              style={{ background: i === 0 ? 'rgb(253 91 32 / 0.12)' : ui.card, boxShadow: `inset 0 0 0 1px ${i === 0 ? ui.green : ui.line}` }}
             >
               {t}
               <span className="mt-0.5 block text-[10px] font-normal" style={{ color: ui.dim }}>
@@ -340,7 +340,7 @@ function TrackScreen() {
             <div key={s} className="flex flex-1 items-center last:flex-none">
               <span
                 className="grid h-4 w-4 shrink-0 place-items-center rounded-full"
-                style={{ background: i <= 2 ? ui.green : ui.card2, boxShadow: i === 2 ? '0 0 0 4px rgb(0 200 83 / 0.25)' : undefined }}
+                style={{ background: i <= 2 ? ui.green : ui.card2, boxShadow: i === 2 ? '0 0 0 4px rgb(253 91 32 / 0.25)' : undefined }}
               >
                 {i < 2 && <Check size={9} strokeWidth={3.5} color="#000" />}
               </span>

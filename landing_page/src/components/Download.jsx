@@ -15,12 +15,12 @@ export default function Download() {
 
   return (
     <section id="download" ref={ref} className="relative overflow-hidden bg-night pt-28 text-snow md:pt-40">
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[70%] bg-[radial-gradient(60%_60%_at_50%_100%,rgb(0_200_83/0.22),transparent)]" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[70%] bg-[radial-gradient(60%_60%_at_50%_100%,rgb(253_91_32/0.25),transparent)]" />
 
       <div className="shell relative text-center">
         <Reveal>
-          <div className="mx-auto grid h-24 w-24 place-items-center rounded-[26px] bg-gradient-to-b from-[#1c1c1e] to-black shadow-[0_0_0_1px_rgb(255_255_255/0.1),0_20px_50px_-10px_rgb(0_200_83/0.35)]">
-            <img src="/images/logo_white.png" alt="" width="583" height="241" className="w-[72px]" />
+          <div className="mx-auto grid h-24 w-24 place-items-center overflow-hidden rounded-[26px] shadow-[0_0_0_1px_rgb(255_255_255/0.1),0_20px_50px_-10px_rgb(253_91_32/0.4)]">
+            <img src="/images/logo.jpeg" alt="Full Speed Logistics app" className="h-full w-full object-cover" />
           </div>
           <h2 className="display-lg mt-8">
             Your next move
@@ -42,7 +42,7 @@ export default function Download() {
             <Phone screen="track" label="Live tracking screen" />
           </motion.div>
           <div className="relative z-10">
-            <Phone screen="home" label="The Carpital Consult home screen showing active shipments" />
+            <Phone screen="home" label="The Full Speed Logistics home screen showing active shipments" />
           </div>
         </motion.div>
       </div>

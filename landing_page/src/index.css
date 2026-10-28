@@ -22,9 +22,9 @@
   --color-snow: #f5f5f7;
   --color-fog: #a1a1a6; /* 8.1:1 on black */
 
-  /* Brand — the app's green */
-  --color-brand: #00c853; /* 9.4:1 on black, 2.2:1 on white */
-  --color-brand-glow: #69f0ae;
+  /* Brand — the app's vivid orange */
+  --color-brand: #fd5b20;
+  --color-brand-glow: #ff7a45;
 
   --ease-apple: cubic-bezier(0.28, 0.11, 0.32, 1);
 }

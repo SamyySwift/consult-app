@@ -12,7 +12,7 @@ export default function Drivers() {
         <div className="grid items-end gap-10 lg:grid-cols-2">
           <Reveal>
             <p className="eyebrow text-brand">For drivers &amp; fleets</p>
-            <h2 className="display-lg mt-3">Drive with Carpital.</h2>
+            <h2 className="display-lg mt-3">Drive with Full Speed.</h2>
           </Reveal>
           <Reveal delay={0.06}>
             <p className="lede text-ink-2">

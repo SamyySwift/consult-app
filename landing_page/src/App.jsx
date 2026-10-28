@@ -1,3 +1,4 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Nav from './components/Nav.jsx'
 import Hero from './components/Hero.jsx'
 import Statement from './components/Statement.jsx'
@@ -10,8 +11,10 @@ import Drivers from './components/Drivers.jsx'
 import Download from './components/Download.jsx'
 import Faq from './components/Faq.jsx'
 import Footer from './components/Footer.jsx'
+import PrivacyPage from './components/PrivacyPage.jsx'
+import TermsPage from './components/TermsPage.jsx'
 
-export default function App() {
+function LandingPage() {
   return (
     <>
       <a
@@ -35,5 +38,17 @@ export default function App() {
       </main>
       <Footer />
     </>
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+      </Routes>
+    </BrowserRouter>
   )
 }

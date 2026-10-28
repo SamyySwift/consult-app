@@ -1,23 +1,24 @@
 // Everything a non-developer is likely to edit lives here: links, prices, copy.
 
 export const company = {
-  name: 'Carpital Consult',
+  name: 'Full Speed Logistics',
   tagline: 'Your vehicle, safely delivered.',
-  email: 'support@carpitalconsult.com',
-  termsUrl: 'https://carpitalconsult.com/terms',
-  privacyUrl: 'https://carpitalconsult.com/privacy',
+  email: 'hello@fullspeed-logistics.com',
+  termsUrl: '/terms',
+  privacyUrl: '/privacy',
+  phone: ['+234 909 610 2602', '+234 806 486 1039'],
 }
 
 // Store links. A `null` link renders the badge as "Coming soon" instead of a
 // dead link, so fill these in as each app goes live.
 export const stores = {
   client: {
-    name: 'Carpital Consult',
+    name: 'Full Speed Logistics',
     appStore: null, // TODO: e.g. https://apps.apple.com/app/id0000000000
     playStore: 'https://play.google.com/store/apps/details?id=com.carpitalconsult.consultlogistics',
   },
   driver: {
-    name: 'Carpital Driver',
+    name: 'Full Speed Driver',
     appStore: null, // TODO: add once the driver app is on the App Store
     playStore: 'https://play.google.com/store/apps/details?id=com.automove.automove_driver',
   },
@@ -247,7 +248,7 @@ export const faqs = [
     a: 'The driver completes a final check with the recipient and hands over the keys and documents. The recipient signs on the driver’s phone, and a proof-of-handover document is saved to your account.',
   },
   {
-    q: 'How do I become a Carpital driver?',
-    a: 'Download the Carpital Driver app, create an account and complete your profile: personal details, NIN, driver’s licence, next of kin and the partner company you drive for. Applications are reviewed within 24 hours.',
+    q: 'How do I become a Full Speed driver?',
+    a: 'Download the Full Speed Driver app, create an account and complete your profile: personal details, NIN, driver\u2019s licence, next of kin and the partner company you drive for. Applications are reviewed within 24 hours.',
   },
 ]

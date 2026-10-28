@@ -70,14 +70,13 @@ export default function Nav() {
           aria-label="Primary"
           className={`relative flex h-14 items-center justify-between pl-5 pr-2 transition-colors duration-500 md:gap-10 ${light ? 'text-ink' : 'text-snow'}`}
         >
-          <a href="#top" aria-label="Carpital Consult, back to top" className="pressable -ml-1 flex items-center p-1">
+          <a href="#top" aria-label="Full Speed Logistics, back to top" className="pressable -ml-1 flex items-center gap-2.5 p-1">
             <img
-              src="/images/logo_white.png"
-              alt=""
-              width="583"
-              height="241"
-              className={`h-[22px] w-auto transition-[filter] duration-500 ${light ? 'invert' : ''}`}
+              src="/images/logo.jpeg"
+              alt="Full Speed Logistics"
+              className="h-7 w-7 rounded-lg object-cover shadow-sm"
             />
+            <span className="text-[0.9375rem] font-bold tracking-tight">Full Speed</span>
           </a>
 
           <ul className="hidden items-center gap-7 md:flex">
